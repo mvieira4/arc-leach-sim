@@ -40,22 +40,18 @@ RUN python3 -m pip install --user cxxfilt
 # Set up ns3
 WORKDIR /home/ns3-user/ns3-workspace
 RUN git clone https://gitlab.com/nsnam/ns-3-dev.git
-RUN ls
 WORKDIR /home/ns3-user/ns3-workspace/ns-3-dev
-RUN ls
 RUN git checkout -b ns-3.37-branch ns-3.37 
 RUN ./ns3 configure --enable-examples --enable-tests --enable-python-bindings
-RUN ./ns3 build
-
-# Set up custom software
-COPY ./wsn-workspace /home/ns3-user/ns3-workspace/scratch/
-RUN ./ns3 build
 
 # Test
 RUN python3 test.py
 
-CMD /bin/bash
+# Set up custom software
+COPY src/ /home/ns3-user/ns3-workspace/ns-3-dev/scratch/
 
 # Build exmaple
+RUN ./ns3 build
 
-# Run exmaple
+# Run examples
+RUN ./ns3 run scratch/third.cc
