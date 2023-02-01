@@ -50,8 +50,5 @@ RUN python3 test.py
 # Set up custom software
 COPY src/ /home/ns3-user/ns3-workspace/ns-3-dev/scratch/
 
-# Build exmaple
+# Build src files 
 RUN ./ns3 build
-
-# Run examples
-RUN ./ns3 run scratch/third.cc
