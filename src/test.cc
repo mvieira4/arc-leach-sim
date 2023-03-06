@@ -22,14 +22,12 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 
+#include "leach-node-app.h"
 
-
-NS_LOG_COMPONENT_DEFINE("ThirdScriptExample");
 
 int main(int argc, char* argv[]){
-    bool verbose = true;
-    uint32_t nWifi = 5;
-    bool tracing = false;
+    bool verbose = false;
+    int nWifi = 2;
 
     if (verbose){
         LogComponentEnable("UdpEchoClientApplication", ns3::LOG_LEVEL_INFO);
@@ -44,7 +42,7 @@ int main(int argc, char* argv[]){
 
 
 
-    // Create & Configure Wifi Devices
+    // Create & Configure Wifi Devices:
     ns3::YansWifiChannelHelper channel = ns3::YansWifiChannelHelper::Default();
     channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
@@ -89,20 +87,8 @@ int main(int argc, char* argv[]){
     ns3::Ipv4InterfaceContainer interfaces = address.Assign(devices);
 
 
+        
 
-    // Config Echo Server
-    ns3::UdpEchoServerHelper echoServer(9);
-
-    ns3::ApplicationContainer serverApps = echoServer.Install(nodes);
-    serverApps.Start(ns3::Seconds(1.0));
-    serverApps.Stop(ns3::Seconds(12.0));
-
-
-
-    // Config Echo Clients
-    ns3::UdpEchoClientHelper echoClient(interfaces.GetAddress(0), 9);
-    echoClient.SetAttribute("Interval", ns3::TimeValue(ns3::Seconds(1.0)));
-    echoClient.SetAttribute("PacketSize", ns3::UintegerValue(1024));
 
     ns3::NodeContainer clientNodes;
 
@@ -110,28 +96,9 @@ int main(int argc, char* argv[]){
         clientNodes.Add(nodes.Get(i));
     }
 
-    ns3::ApplicationContainer clientApps = echoClient.Install(clientNodes);
-
-    clientApps.Start(ns3::Seconds(2.0));
-    clientApps.Stop(ns3::Seconds(12.0));
-
-
-
 
     ns3::Ipv4GlobalRoutingHelper::PopulateRoutingTables();
     
-
-
-    // Install Batteries on Nodes
-    ns3::BasicEnergySourceHelper battery;
-    ns3::EnergySourceContainer batteries = battery.Install(nodes);
-
-
-    // Install Energy Model on Nodes
-    ns3::WifiRadioEnergyModelHelper energyModel;
-    energyModel.Install(devices, batteries);
-
-
     // Run Sim
     ns3::Simulator::Stop(ns3::Seconds(12.0));
     ns3::Simulator::Run();
