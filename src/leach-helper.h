@@ -4,22 +4,28 @@
 #include "ns3/node-container.h"
 #include "ns3/object-factory.h"
 
-#include "leach-app.h"
+#include "ns3/leach-app.h"
 
-class LeachNodeHelper{
-    public:
-        LeachNodeHelper();
 
-        ns3::ApplicationContainer Install(ns3::Ptr<ns3::Node> node) const;
 
-        ns3::ApplicationContainer Install(std::string nodeName) const;
 
-        ns3::ApplicationContainer Install(ns3::NodeContainer nodes) const;
 
-        void SetAttribute(std::string name, const ns3::AttributeValue &value);
+namespace ns3{
+    class LeachNodeHelper{
+        public:
+            LeachNodeHelper();
 
-    private:
-        ns3::Ptr<ns3::Application> InstallPriv(ns3::Ptr<ns3::Node> node) const;
+            ApplicationContainer Install(Ptr<Node> node) const;
 
-        ns3::ObjectFactory m_factory;
-};
+            ApplicationContainer Install(std::string nodeName) const;
+
+            ApplicationContainer Install(NodeContainer nodes) const;
+
+            void SetAttribute(std::string name, const AttributeValue &value);
+
+        private:
+            Ptr<Application> InstallPriv(Ptr<Node> node) const;
+
+            ObjectFactory m_factory;
+    };
+}

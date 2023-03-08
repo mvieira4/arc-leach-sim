@@ -1,34 +1,41 @@
 #include "leach-helper.h"
 
-LeachNodeHelper::LeachNodeHelper(){
 
-}
 
-ns3::ApplicationContainer LeachNodeHelper::Install(ns3::Ptr<ns3::Node> node) const{
-    return ns3::ApplicationContainer(InstallPriv(node));
-}
 
-ns3::ApplicationContainer LeachNodeHelper::Install(ns3::NodeContainer nodes) const{
-    ns3::ApplicationContainer apps;
-    for(ns3::NodeContainer::Iterator i = nodes.Begin(); i != nodes.End(); i++){
-        apps.Add(InstallPriv(*i));
+
+namespace ns3{
+    LeachNodeHelper::LeachNodeHelper(){
+        m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
     }
 
-    return apps;
-}
+    ApplicationContainer LeachNodeHelper::Install(Ptr<Node> node) const{
+        return ApplicationContainer(InstallPriv(node));
+    }
 
-ns3::ApplicationContainer LeachNodeHelper::Install(std::string nodeName) const{
-    ns3::Ptr<ns3::Node> node = ns3::Names::Find<ns3::Node>(nodeName);
-    return ns3::ApplicationContainer(InstallPriv(node));
-}
+    ApplicationContainer LeachNodeHelper::Install(NodeContainer nodes) const{
+        ApplicationContainer apps;
+        for(NodeContainer::Iterator i = nodes.Begin(); i != nodes.End(); i++){
+            apps.Add(InstallPriv(*i));
+        }
 
-ns3::Ptr<ns3::Application> LeachNodeHelper::InstallPriv(ns3::Ptr<ns3::Node> node) const{
-    ns3::Ptr<ns3::Application> app = m_factory.Create<LeachNodeApplication>();
-    node->AddApplication(app);
+        return apps;
+    }
 
-    return app;
-}
+    ApplicationContainer LeachNodeHelper::Install(std::string nodeName) const{
+        Ptr<Node> node = Names::Find<Node>(nodeName);
+        return ApplicationContainer(InstallPriv(node));
+    } 
 
-void LeachNodeHelper::SetAttribute(std::string name, const ns3::AttributeValue &value){
-    m_factory.Set(name, value);
+    void LeachNodeHelper::SetAttribute(std::string name, const AttributeValue &value){
+        m_factory.Set(name, value);
+    }
+
+    Ptr<Application> LeachNodeHelper::InstallPriv(Ptr<Node> node) const{
+        Ptr<Application> app;  
+        app = m_factory.Create<LeachNodeApplication>();
+        node->AddApplication(app);
+
+        return app;
+    } 
 }

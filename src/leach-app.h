@@ -6,8 +6,6 @@
 #include "ns3/applications-module.h"
 #include "ns3/socket.h"
 
-#include "info-id-tag.h"
-#include "seq-num-tag.h"
 
 
 
@@ -16,64 +14,74 @@ const uint32_t PACKET_SIZE = 1024;
 const bool ALLOW_BROADCAST = false;
 const uint16_t PORT_NUM = 5000;
 
+namespace ns3{
+    class LeachNodeApplication: public Application{
+        public:
+            LeachNodeApplication();
 
-class LeachNodeApplication: protected ns3::Application{
-    public:
-        LeachNodeApplication();
+            ~LeachNodeApplication();
 
-        ~LeachNodeApplication();
+            void SetInterval(Time time);
 
-        void SetInterval(ns3::Time time);
+            void SetChProb(double prob);
 
-    private:
-        void StartApplication() override;
+            Time GetInterval();
 
-        void StopApplication() override;
+            double GetChProb();
 
-        ns3::TypeId GetTypeId();
-        
-        void ScheduleTransmit(ns3::Time dt);
+            static TypeId GetTypeId();
 
-        void ExecuteRound();
+        protected:
+            void DoDispose() override;
+            
+        private:
+            void StartApplication() override;
 
-        void Send(uint8_t data[]);
+            void StopApplication() override;
 
-        void HandleRead(ns3::Ptr<ns3::Socket> socket);
+            void ScheduleTransmit(Time dt);
 
-        void FindClusterHead();
+            void ExecuteRound();
 
-        void AdvertiseClusterHead();
+            void Send();
 
-        void ReportEvent();
+            void HandleRead(Ptr<Socket> socket);
 
-        ns3::Ptr<ns3::Node> m_targetNode;
+            void FindClusterHead();
 
-        ns3::Ptr<ns3::Socket> m_socket;
-        ns3::Ptr<ns3::Socket> m_socket6;
+            void AdvertiseClusterHead();
 
-        ns3::PacketLossCounter m_lossCounter;
+            void ReportEvent();
 
-        ns3::TracedCallback<ns3::Ptr<const ns3::Packet>> m_rxTrace;
-        ns3::TracedCallback<ns3::Ptr<const ns3::Packet>> m_txTrace;
+            Ptr<Socket> m_socket;
+            Ptr<Socket> m_socket6;
 
-        ns3::TracedCallback<ns3::Ptr<const ns3::Packet>, const ns3::Address&, 
-                                const ns3::Address&> m_rxTraceWithAddresses;
-        ns3::TracedCallback<ns3::Ptr<const ns3::Packet>, const ns3::Address&, 
-                                const ns3::Address&> m_txTraceWithAddresses;
+            PacketLossCounter m_lossCounter;
 
-        std::vector<ns3::Ptr<ns3::Address>> m_nearbyClusterHeads;
-        ns3::EventId m_sendEvent;
-        ns3::Time m_interval;
-         
-        ns3::Address m_localAddress;
-        ns3::Address m_targetAddress;
+            TracedCallback<Ptr<const Packet>> m_rxTrace;
+            TracedCallback<Ptr<const Packet>> m_txTrace;
 
-        uint32_t m_sent;
-        uint32_t m_received;
+            TracedCallback<Ptr<const Packet>, const Address&, 
+                                    const Address&> m_rxTraceWithAddresses;
+            TracedCallback<Ptr<const Packet>, const Address&, 
+                                    const Address&> m_txTraceWithAddresses;
 
-        uint32_t m_port;
-        uint32_t m_size;
-        uint32_t m_count;
-        uint32_t m_dataSize;
-        uint8_t *m_data;
-};
+            std::vector<Address> m_nearbyClusterHeads;
+            EventId m_sendEvent;
+            Time m_interval;
+            double m_chProb;
+             
+            Address m_localAddress;
+            Address m_targetAddress;
+
+            uint32_t m_sent;
+            uint32_t m_received;
+
+            uint32_t m_port;
+            uint32_t m_size;
+            uint32_t m_count;
+            uint32_t m_dataSize;
+            uint8_t *m_data;
+    }; // LeachApplication
+} // ns3
+
