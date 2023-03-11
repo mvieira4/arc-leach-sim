@@ -5,35 +5,49 @@
 
 
 namespace ns3{
-    LeachNodeHelper::LeachNodeHelper(){
+    NS_LOG_COMPONENT_DEFINE("LeachNodeHelper");
+
+    LeachNodeHelper::LeachNodeHelper(uint32_t nodeNum){
+        NS_LOG_FUNCTION(this);
+
+        NS_LOG_DEBUG("LeachNodeHelper: Number of nodes is " << nodeNum);
+
         m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
     }
 
-    ApplicationContainer LeachNodeHelper::Install(Ptr<Node> node) const{
-        return ApplicationContainer(InstallPriv(node));
+    LeachNodeHelper::LeachNodeHelper(uint32_t nodeNum, double malProb){
+        m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
+        m_factory.Set("IsCh", BooleanValue(true));
     }
 
-    ApplicationContainer LeachNodeHelper::Install(NodeContainer nodes) const{
+    ApplicationContainer LeachNodeHelper::Install(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
+        return ApplicationContainer(InstallPriv(node, energyModel));
+    }
+
+    ApplicationContainer LeachNodeHelper::Install(NodeContainer nodes, DeviceEnergyModelContainer energyModels) const{
         ApplicationContainer apps;
-        for(NodeContainer::Iterator i = nodes.Begin(); i != nodes.End(); i++){
-            apps.Add(InstallPriv(*i));
+
+        NodeContainer::Iterator node = nodes.Begin();
+        DeviceEnergyModelContainer::Iterator energyModel = energyModels.Begin();
+
+        while(node != nodes.End()){
+            apps.Add(InstallPriv(*node, *energyModel));
         }
+
 
         return apps;
     }
-
-    ApplicationContainer LeachNodeHelper::Install(std::string nodeName) const{
-        Ptr<Node> node = Names::Find<Node>(nodeName);
-        return ApplicationContainer(InstallPriv(node));
-    } 
 
     void LeachNodeHelper::SetAttribute(std::string name, const AttributeValue &value){
         m_factory.Set(name, value);
     }
 
-    Ptr<Application> LeachNodeHelper::InstallPriv(Ptr<Node> node) const{
-        Ptr<Application> app;  
+    Ptr<Application> LeachNodeHelper::InstallPriv(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
+        Ptr<LeachNodeApplication> app;  
+
         app = m_factory.Create<LeachNodeApplication>();
+        app->SetEnergyModel(energyModel);
+
         node->AddApplication(app);
 
         return app;

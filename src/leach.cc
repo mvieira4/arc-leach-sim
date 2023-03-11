@@ -22,6 +22,7 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
+#include "ns3/netanim-module.h"
 
 #include "ns3/leach-helper.h"
 
@@ -29,12 +30,15 @@ using namespace ns3;
 
 int main(int argc, char* argv[]){
     bool verbose = true;
-    int nWifi = 2;
+    int nWifi = 5;
 
     if (verbose){
-        LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
-        LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
+        LogComponentEnable("Packet", LOG_LEVEL_INFO);
+        LogComponentEnable("Socket", LOG_LEVEL_INFO);
         LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
+        //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
+        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_INFO);
+        LogComponentEnable("LeachNodeHelper", LOG_LEVEL_INFO);
     }
 
     // Create Nodes
@@ -43,7 +47,7 @@ int main(int argc, char* argv[]){
 
     // Create & Configure Wifi Devices
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
-    channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
+    //channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 
     YansWifiPhyHelper phy;
@@ -63,9 +67,9 @@ int main(int argc, char* argv[]){
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(1.0),
-                                  "DeltaY", DoubleValue(1.0),
-                                  "GridWidth", UintegerValue(8),
+                                  "DeltaX", DoubleValue(2.0),
+                                  "DeltaY", DoubleValue(2.0),
+                                  "GridWidth", UintegerValue(4),
                                   "LayoutType", StringValue("RowFirst"));
 
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
@@ -77,7 +81,7 @@ int main(int argc, char* argv[]){
 
     Ipv4AddressHelper address;
 
-    address.SetBase("10.1.3.0", "255.255.255.0");
+    address.SetBase("10.0.0.0", "255.255.255.0");
     Ipv4InterfaceContainer interfaces = address.Assign(devices);
 
     /*
@@ -111,11 +115,6 @@ int main(int argc, char* argv[]){
         sensors.Add(nodes.Get(i));
     }
 
-    LeachNodeHelper nodeLeach;
-
-    ApplicationContainer nodeApps = nodeLeach.Install(nodes);
-
-    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
     // Install Batteries on Nodes
     BasicEnergySourceHelper battery;
@@ -123,10 +122,29 @@ int main(int argc, char* argv[]){
 
     // Install Energy Model on Nodes
     WifiRadioEnergyModelHelper energyModel;
-    energyModel.Install(devices, batteries);
+    DeviceEnergyModelContainer energyModels = energyModel.Install(devices, batteries);
+
+
+    LeachNodeHelper nodeLeach(nWifi);
+
+    ApplicationContainer nodeApps = nodeLeach.Install(nodes, batteries);
+
+    nodeApps.Start(Seconds(0));
+    nodeApps.Stop(Seconds(20));
+
+
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+    AnimationInterface anim("animation.xml");
+
+    for (NodeContainer::Iterator it = nodes.Begin(); it != nodes.End(); ++it) {
+      Ptr<Node> node = *it;
+      anim.SetConstantPosition(node, 10, 10);
+      anim.UpdateNodeColor(node, 255, 0, 0);
+    }
 
     // Run Sim
-    Simulator::Stop(Seconds(12.0));
+    Simulator::Stop(Seconds(20));
     Simulator::Run();
     Simulator::Destroy();
 

@@ -1,10 +1,14 @@
 #include <array>
 #include <vector>
+#include <cstdlib>
 
 #include "ns3/network-module.h"
 #include "ns3/core-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/socket.h"
+#include "ns3/udp-socket.h"
+#include "ns3/device-energy-model-container.h"
+#include "ns3/wifi-radio-energy-model.h"
 
 
 
@@ -23,13 +27,21 @@ namespace ns3{
 
             void SetInterval(Time time);
 
-            void SetChProb(double prob);
-
             Time GetInterval();
 
-            double GetChProb();
-
             static TypeId GetTypeId();
+
+            void SetIsCh(bool x);
+
+            bool GetIsCh();
+
+            void SetIsMal(bool x);
+
+            bool GetIsMal();
+
+            void SetEnergyModel(Ptr<DeviceEnergyModel> model);
+
+            Ptr<WifiRadioEnergyModel> GetEnergyModel();
 
         protected:
             void DoDispose() override;
@@ -39,22 +51,24 @@ namespace ns3{
 
             void StopApplication() override;
 
-            void ScheduleTransmit(Time dt);
+            void ScheduleNextRound(Time dt);
 
             void ExecuteRound();
+
+            void ScheduleTransmit(Time dt);
 
             void Send();
 
             void HandleRead(Ptr<Socket> socket);
 
-            void FindClusterHead();
+            void FindCh();
 
-            void AdvertiseClusterHead();
+            void Advertise();
 
             void ReportEvent();
 
             Ptr<Socket> m_socket;
-            Ptr<Socket> m_socket6;
+            Ptr<UdpSocket> m_udpSocket;
 
             PacketLossCounter m_lossCounter;
 
@@ -66,13 +80,15 @@ namespace ns3{
             TracedCallback<Ptr<const Packet>, const Address&, 
                                     const Address&> m_txTraceWithAddresses;
 
-            std::vector<Address> m_nearbyClusterHeads;
             EventId m_sendEvent;
+            EventId m_roundEvent;
             Time m_interval;
-            double m_chProb;
+
+            bool m_isCh;
+            bool m_isMal;
              
-            Address m_localAddress;
-            Address m_targetAddress;
+            Ipv4Address m_localAddress;
+            Ipv4Address m_targetAddress;
 
             uint32_t m_sent;
             uint32_t m_received;
@@ -80,8 +96,11 @@ namespace ns3{
             uint32_t m_port;
             uint32_t m_size;
             uint32_t m_count;
-            uint32_t m_dataSize;
+            
             uint8_t *m_data;
-    }; // LeachApplication
-} // ns3
+            uint32_t m_dataSize;
+
+            Ptr<WifiRadioEnergyModel> m_energyModel;
+    }; 
+}
 

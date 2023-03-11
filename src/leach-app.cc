@@ -1,71 +1,111 @@
 #include "ns3/address-utils.h"
+#include "ns3/internet-module.h"
+#include "ns3/network-module.h"
 #include "ns3/inet-socket-address.h"
 #include "ns3/inet6-socket-address.h"
 #include "ns3/ipv4-address.h"
 #include "ns3/ipv6-address.h"
 #include "ns3/udp-socket.h"
+#include "ns3/packet-socket-factory.h"
+#include "ns3/yans-wifi-helper.h"
+#include "ns3/basic-energy-source.h"
 
 #include "leach-app.h"
 
 namespace ns3{
     NS_LOG_COMPONENT_DEFINE("LeachNodeApplication");
-
+    
     LeachNodeApplication::LeachNodeApplication(): m_lossCounter(0){
         NS_LOG_FUNCTION(this);
 
         m_socket = nullptr;
-        m_socket6 = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(1.0);
+        m_interval = Seconds(4.0);
         m_sent = 0;
         m_count = 0;
-        m_data = nullptr;
         m_dataSize = 0;
+        m_size = 1024;
+        m_data = nullptr;
     }
+
+
 
     LeachNodeApplication::~LeachNodeApplication(){
         NS_LOG_FUNCTION(this);
 
         m_socket = nullptr;
-        m_socket6 = nullptr;
         m_sendEvent = EventId();
 
         delete[] m_data;
         m_data = nullptr;
         m_dataSize = 0;
     }
+    
 
+
+
+    // Getters & Setters
     void LeachNodeApplication::SetInterval(Time time){
         m_interval = time;
-    }
-
-    void LeachNodeApplication::SetChProb(double prob){
-        m_chProb = prob;
     }
 
     Time LeachNodeApplication::GetInterval(){
         return m_interval;
     }
 
-    double LeachNodeApplication::GetChProb(){
-        return m_chProb;
+    void LeachNodeApplication::SetIsCh(bool x){
+        m_isCh = x;
     }
 
+
+    bool LeachNodeApplication::GetIsCh(){
+        return m_isCh;
+    }
+
+    void LeachNodeApplication::SetIsMal(bool x){
+        m_isMal = x;
+    }
+
+
+    bool LeachNodeApplication::GetIsMal(){
+        return m_isMal;
+    }
+
+    void LeachNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
+        m_energyModel = DynamicCast<WifiRadioEnergyModel>(model);
+    }
+
+    Ptr<WifiRadioEnergyModel> LeachNodeApplication::GetEnergyModel(){
+        return m_energyModel;
+    }
+
+
+
+    // Methods
     TypeId LeachNodeApplication::GetTypeId(){
-        static TypeId tid = TypeId("UdpServer")
+        static TypeId tid = TypeId("ns3::LeachNodeApplication")
             .SetParent<Application>()
             .SetGroupName("Applications")
-            .AddConstructor<UdpServer>()
-            .AddAttribute("Port", "Port on which we listen for incoming packets.", UintegerValue(100),
-                            MakeUintegerAccessor(&LeachNodeApplication::m_port), MakeUintegerChecker<uint16_t>())
+            .AddConstructor<LeachNodeApplication>()
+            .AddAttribute("IsCh", "If node is cluster head", BooleanValue(true), 
+                            MakeDoubleAccessor(&LeachNodeApplication::m_isCh), MakeBooleanChecker())
+            .AddAttribute("IsMal", "If node is malicious", BooleanValue(false), 
+                            MakeDoubleAccessor(&LeachNodeApplication::m_isMal), MakeBooleanChecker())
             .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&LeachNodeApplication::m_rxTrace),
                             "Packet::TracedCallback")
-            .AddTraceSource("RxWithAddresses", "A packet has been received",
+            .AddTraceSource("RxWithAddresses", "A packet has been sent",
                             MakeTraceSourceAccessor(&LeachNodeApplication::m_rxTraceWithAddresses),
+                            "Packet::TwoAddressTracedCallback")
+            .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&LeachNodeApplication::m_txTrace),
+                            "Packet::TracedCallback")
+            .AddTraceSource("TxWithAddresses", "A packet has been sent",
+                            MakeTraceSourceAccessor(&LeachNodeApplication::m_txTraceWithAddresses),
                             "Packet::TwoAddressTracedCallback");
 
         return tid;
     }
+
+
 
     void LeachNodeApplication::DoDispose(){
         NS_LOG_FUNCTION(this);
@@ -73,57 +113,45 @@ namespace ns3{
         Application::DoDispose();
     }
 
+
+
     void LeachNodeApplication::StartApplication(){
         NS_LOG_FUNCTION(this);
-     
-        if (!m_socket){
-            TypeId tid = TypeId::LookupByName("UdpSocketFactory");
-            m_socket = Socket::CreateSocket(GetNode(), tid);
-            InetSocketAddress local = InetSocketAddress(Ipv4Address::GetAny(), m_port);
-            if (m_socket->Bind(local) == -1){
-                NS_FATAL_ERROR("Failed to bind socket");
-            }
-            if (addressUtils::IsMulticast(m_localAddress)){
-                Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket>(m_socket);
-                if (udpSocket){
-                    // equivalent to setsockopt (MCAST_JOIN_GROUP)
-                    udpSocket->MulticastJoinGroup(0, m_localAddress);
-                }
-                else{
-                    NS_FATAL_ERROR("Error: Failed to join multicast group");
-                }
-            }
+
+        Ptr<Ipv4> ipv4 = m_node->GetObject<Ipv4>();
+        m_localAddress = ipv4->GetAddress (1, 0).GetLocal();
+
+        TypeId tid = TypeId::LookupByName("ns3::Ipv4RawSocketFactory");
+        m_socket = Socket::CreateSocket(GetNode(), tid);
+        m_socket->SetAllowBroadcast(true);
+
+
+        if (m_socket->Bind(InetSocketAddress(m_localAddress, m_port)) == -1){
+            NS_FATAL_ERROR("Failed to bind socket");
         }
-     
-        if (!m_socket6){
-            TypeId tid = TypeId::LookupByName("UdpSocketFactory");
-            m_socket6 = Socket::CreateSocket(GetNode(), tid);
-            Inet6SocketAddress local6 = Inet6SocketAddress(Ipv6Address::GetAny(), m_port);
-            if (m_socket6->Bind(local6) == -1){
-                NS_FATAL_ERROR("Failed to bind socket");
-            }
-            if (addressUtils::IsMulticast(local6)){
-                Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket>(m_socket6);
-                if (udpSocket){
-                    udpSocket->MulticastJoinGroup(0, local6);
-                }
-                else{
-                    NS_FATAL_ERROR("Error: Failed to join multicast group");
-                }
-            }
-        }
-     
+
         m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
-        m_socket6->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
+
+
+        ScheduleNextRound(Seconds(0));
     }
 
-    void LeachNodeApplication::StopApplication(){
-        NS_LOG_FUNCTION(this);
-     
-        if (m_socket){
-            m_socket->SetRecvCallback(MakeNullCallback<void, Ptr<Socket>>());
-        }
+
+
+    void LeachNodeApplication::ScheduleNextRound(Time dt){
+        NS_LOG_FUNCTION(this << dt);
+
+        m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
     }
+
+
+
+    void LeachNodeApplication::ExecuteRound(){
+        Advertise();
+
+        ScheduleNextRound(m_interval);
+    }
+
 
 
     void LeachNodeApplication::ScheduleTransmit(Time dt){
@@ -132,87 +160,64 @@ namespace ns3{
         m_sendEvent = Simulator::Schedule(dt, &LeachNodeApplication::Send, this);
     }
 
+
+
     void LeachNodeApplication::Send(){
-        NS_LOG_FUNCTION(this);
-     
-        NS_ASSERT(m_sendEvent.IsExpired());
-     
-        Ptr<Packet> packet;
-        if (m_dataSize)
-        {
-            //
-            // If m_dataSize is non-zero, we have a data buffer of the same size that we
-            // are expected to copy and send.  This state of affairs is created if one of
-            // the Fill functions is called.  In this case, m_size must have been set
-            // to agree with m_dataSize
-            //
-            NS_ASSERT_MSG(m_dataSize == m_size,
-                          "UdpEchoClient::Send(): m_size and m_dataSize inconsistent");
-            NS_ASSERT_MSG(m_data, "UdpEchoClient::Send(): m_dataSize but no m_data");
-            packet = Create<Packet>(m_data, m_dataSize);
-        }
-        else
-        {
-            //
-            // If m_dataSize is zero, the client has indicated that it doesn't care
-            // about the data itself either by specifying the data size by setting
-            // the corresponding attribute or by not calling a SetFill function.  In
-            // this case, we don't worry about it either.  But we do allow m_size
-            // to have a value different from the (zero) m_dataSize.
-            //
-            packet = Create<Packet>(m_size);
-        }
-        Address localAddress;
-        m_socket->GetSockName(localAddress);
-        // call to the trace sinks before the packet is actually sent,
-        // so that tags added to the packet can be sent as well
-        m_txTrace(packet);
-        if (Ipv4Address::IsMatchingType(m_targetAddress))
-        {
-            m_txTraceWithAddresses(packet, localAddress,
-                InetSocketAddress(Ipv4Address::ConvertFrom(m_targetAddress), m_port));
-        }
-        else if (Ipv6Address::IsMatchingType(m_targetAddress))
-        {
-            m_txTraceWithAddresses(packet, localAddress,
-                                    Inet6SocketAddress(Ipv6Address::ConvertFrom(m_targetAddress), m_port));
-        }
-        m_socket->Send(packet);
-        ++m_sent;
-     
-        if (Ipv4Address::IsMatchingType(m_targetAddress)){
-            NS_LOG_INFO("At time " << Simulator::Now().As(Time::S) << " client sent " << m_size
-                            << " bytes to " << Ipv4Address::ConvertFrom(m_targetAddress)
-                            << " port " << m_port);
-        }
-        else if (Ipv6Address::IsMatchingType(m_targetAddress)){
-            NS_LOG_INFO("At time " << Simulator::Now().As(Time::S) << " client sent " << m_size
-                            << " bytes to " << Ipv6Address::ConvertFrom(m_targetAddress)
-                            << " port " << m_port);
-        }
-        else if (InetSocketAddress::IsMatchingType(m_targetAddress)){
-            NS_LOG_INFO("At time " << Simulator::Now().As(Time::S) << " client sent " << m_size << " bytes to "
-                           << InetSocketAddress::ConvertFrom(m_targetAddress).GetIpv4() << " port "
-                           << InetSocketAddress::ConvertFrom(m_targetAddress).GetPort());
-        }
-        else if (Inet6SocketAddress::IsMatchingType(m_targetAddress)){
-            NS_LOG_INFO("At time " << Simulator::Now().As(Time::S) << " client sent " << m_size << " bytes to "
-                           << Inet6SocketAddress::ConvertFrom(m_targetAddress).GetIpv6() << " port "
-                           << Inet6SocketAddress::ConvertFrom(m_targetAddress).GetPort());
-        }
-     
-        if (m_sent < m_count || m_count == 0){
-            ScheduleTransmit(m_interval);
+
+        Ptr<WifiNetDevice> device = DynamicCast<WifiNetDevice>(GetNode()->GetDevice(0));
+
+        Ptr<Packet> packet = Create<Packet>(m_size);
+
+        Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
+
+        for (uint32_t i = 0; i < channel->GetNDevices(); i++){
+            Ptr<Ipv4> ipv4= channel->GetDevice(i)->GetNode()->GetObject<Ipv4>();
+            Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
+
+            if(address != m_localAddress){
+                m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
+
+                NS_LOG_DEBUG("Sent from ip " << m_localAddress
+                                    << " at time " << Simulator::Now().As(Time::S)
+                                    << " to ip " << address);
+                m_txTrace(packet);
+                m_rxTraceWithAddresses(packet, m_localAddress, address);
+            }
         }
     }
 
+
+
     void LeachNodeApplication::HandleRead(Ptr<Socket> socket){
         NS_LOG_FUNCTION(this << socket);
+
+        Ptr<Packet> packet;
+        Address from;
+        Address localAddress;
+
+        while ((packet = socket->RecvFrom(from))){
+            NS_LOG_INFO("Recv at ip " << m_localAddress << " at time " 
+                                << Simulator::Now().As(Time::S) << " from "
+                                << InetSocketAddress::ConvertFrom(from).GetIpv4());
+
+            socket->GetSockName(localAddress);
+
+            m_rxTrace(packet);
+            m_rxTraceWithAddresses(packet, from, localAddress);
+        }
+    }
+
+
+
+    void LeachNodeApplication::FindCh(){
+        NS_LOG_FUNCTION(this << m_socket);
+
         Ptr<Packet> packet;
         Address from;
         Address local;
-        while ((packet = socket->RecvFrom(from))){
-            socket->GetSockName(local);
+
+        while ((packet = m_socket->RecvFrom(from))){
+            m_socket->GetSockName(local);
             m_rxTrace(packet);
             m_rxTraceWithAddresses(packet, from, local);
             if (packet->GetSize() > 0){
@@ -227,8 +232,7 @@ namespace ns3{
                                     << " Uid: " << packet->GetUid() << " TXtime: "
                                     << seqTs.GetTs() << " RXtime: " << Simulator::Now()
                                     << " Delay: " << Simulator::Now() - seqTs.GetTs());
-                }
-                else if (Inet6SocketAddress::IsMatchingType(from)){
+                } else if (Inet6SocketAddress::IsMatchingType(from)){
                     NS_LOG_INFO("TraceDelay: RX " << receivedSize << " bytes from "
                                     << Inet6SocketAddress::ConvertFrom(from).GetIpv6()
                                     << " Sequence Number: " << currentSequenceNumber
@@ -243,15 +247,26 @@ namespace ns3{
         }
     }
 
-    void LeachNodeApplication::FindClusterHead(){
-        // Find Closest Cluster Head 
+
+
+    void LeachNodeApplication::Advertise(){
+        ScheduleTransmit(MilliSeconds(200));
     }
 
-    void LeachNodeApplication::AdvertiseClusterHead(){
-        // Broadcast to Surrounding Nodes
-    }
+
 
     void LeachNodeApplication::ReportEvent(){
-        // Send Regular Packet to Base
+
+        ScheduleTransmit(MilliSeconds(200));
+    }
+
+
+
+    void LeachNodeApplication::StopApplication(){
+        NS_LOG_FUNCTION(this);
+     
+        if (m_socket){
+            m_socket->SetRecvCallback(MakeNullCallback<void, Ptr<Socket>>());
+        }
     }
 } // ns3
