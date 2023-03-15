@@ -55,9 +55,9 @@ namespace ns3{
 
             void ExecuteRound();
 
-            void ScheduleTransmit(Time dt);
+            void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
 
-            void Send();
+            void Send(Ptr<Packet>, Ipv4Address);
 
             void HandleRead(Ptr<Socket> socket);
 
@@ -68,7 +68,6 @@ namespace ns3{
             void ReportEvent();
 
             Ptr<Socket> m_socket;
-            Ptr<UdpSocket> m_udpSocket;
 
             PacketLossCounter m_lossCounter;
 
@@ -88,17 +87,18 @@ namespace ns3{
             bool m_isMal;
              
             Ipv4Address m_localAddress;
-            Ipv4Address m_targetAddress;
+            Ipv4Address m_chAddress;
+            Ipv4Address m_sinkAddress;
+
+            std::vector<Ipv4Address> blacklist;
 
             uint32_t m_sent;
             uint32_t m_received;
 
             uint32_t m_port;
-            uint32_t m_size;
-            uint32_t m_count;
-            
-            uint8_t *m_data;
-            uint32_t m_dataSize;
+            uint32_t m_packetSize;
+
+            Ptr<Packet> m_agroPacket;
 
             Ptr<WifiRadioEnergyModel> m_energyModel;
     }; 

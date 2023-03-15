@@ -32,6 +32,9 @@ namespace ns3{
 
         while(node != nodes.End()){
             apps.Add(InstallPriv(*node, *energyModel));
+
+            node++;
+            energyModel++;
         }
 
 

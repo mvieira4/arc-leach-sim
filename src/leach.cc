@@ -22,7 +22,6 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
-#include "ns3/netanim-module.h"
 
 #include "ns3/leach-helper.h"
 
@@ -33,10 +32,22 @@ int main(int argc, char* argv[]){
     int nWifi = 5;
 
     if (verbose){
-        LogComponentEnable("Packet", LOG_LEVEL_INFO);
-        LogComponentEnable("Socket", LOG_LEVEL_INFO);
-        LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
+        //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
+        //LogComponentEnable("Ipv4EndPointDemux", LOG_LEVEL_ALL);
+        //LogComponentEnable("Packet", LOG_LEVEL_INFO);
+        //LogComponentEnable("Socket", LOG_LEVEL_ALL);
+        //LogComponentEnable("UdpSocketImpl", LOG_LEVEL_ALL);
+        //LogComponentEnable("ArpCache", ns3::LOG_LEVEL_ALL);
+        //LogComponentEnable("ArpL3Protocol", LOG_LEVEL_ALL);
+        //LogComponentEnable("Ipv4L3Protocol", LOG_LEVEL_INFO);
+        //LogComponentEnable("Ipv4Interface", LOG_LEVEL_ALL);
+        //LogComponentEnable("IpL4Protocol", LOG_LEVEL_ALL);
+        //LogComponentEnable("UdpL4Protocol", LOG_LEVEL_ALL);
+        //LogComponentEnable("YansWifiPhy", ns3::LOG_LEVEL_INFO);
+        //LogComponentEnable("YansWifiChannel", LOG_LEVEL_INFO);
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
+        //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
+        //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
         LogComponentEnable("LeachNodeApplication", LOG_LEVEL_INFO);
         LogComponentEnable("LeachNodeHelper", LOG_LEVEL_INFO);
     }
@@ -47,32 +58,35 @@ int main(int argc, char* argv[]){
 
     // Create & Configure Wifi Devices
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
-    //channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
+    channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 
     YansWifiPhyHelper phy;
-    phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
+    //phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
     phy.SetChannel(channel.Create());
 
     WifiMacHelper mac;
+    mac.SetType("ns3::AdhocWifiMac");
 
     WifiHelper wifi;
-    wifi.SetStandard(WIFI_STANDARD_80211b);
+    wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
+    //wifi.SetStandard(WIFI_STANDARD_80211b); // 2.4GHz
 
     NetDeviceContainer devices = wifi.Install(phy, mac, nodes);
 
     // Configure Mobility Model
     MobilityHelper mobility;
 
+    // Set fixed position 
+    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(2.0),
-                                  "DeltaY", DoubleValue(2.0),
-                                  "GridWidth", UintegerValue(4),
+                                  "DeltaX", DoubleValue(.01),
+                                  "DeltaY", DoubleValue(.01),
+                                  "GridWidth", UintegerValue(1),
                                   "LayoutType", StringValue("RowFirst"));
 
-    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.Install(nodes);
 
     // Config Ineternet Stack
@@ -83,38 +97,6 @@ int main(int argc, char* argv[]){
 
     address.SetBase("10.0.0.0", "255.255.255.0");
     Ipv4InterfaceContainer interfaces = address.Assign(devices);
-
-    /*
-    // Config Echo Server
-    UdpEchoServerHelper echoServer(9);
-
-    ApplicationContainer serverApps = echoServer.Install(nodes);
-    serverApps.Start(Seconds(1.0));
-    serverApps.Stop(Seconds(12.0));
-
-    // Config Echo Clients
-    UdpEchoClientHelper echoClient(interfaces.GetAddress(0), 9);
-    echoClient.SetAttribute("Interval", TimeValue(Seconds(1.0)));
-    echoClient.SetAttribute("PacketSize", UintegerValue(1024));
-
-    NodeContainer clientNodes;
-
-    for(int i = 1; i < nWifi; i++){
-        clientNodes.Add(nodes.Get(i));
-    }
-
-    ApplicationContainer clientApps = echoClient.Install(clientNodes);
-
-    clientApps.Start(Seconds(1.0));
-    clientApps.Stop(Seconds(12.0));
-    */
-
-    NodeContainer sensors;
-
-    for(int i = 1; i < nWifi; i++){
-        sensors.Add(nodes.Get(i));
-    }
-
 
     // Install Batteries on Nodes
     BasicEnergySourceHelper battery;
@@ -127,24 +109,16 @@ int main(int argc, char* argv[]){
 
     LeachNodeHelper nodeLeach(nWifi);
 
-    ApplicationContainer nodeApps = nodeLeach.Install(nodes, batteries);
+    ApplicationContainer nodeApps = nodeLeach.Install(nodes, energyModels);
 
-    nodeApps.Start(Seconds(0));
+    nodeApps.Start(Seconds(1));
     nodeApps.Stop(Seconds(20));
 
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    AnimationInterface anim("animation.xml");
-
-    for (NodeContainer::Iterator it = nodes.Begin(); it != nodes.End(); ++it) {
-      Ptr<Node> node = *it;
-      anim.SetConstantPosition(node, 10, 10);
-      anim.UpdateNodeColor(node, 255, 0, 0);
-    }
-
     // Run Sim
-    Simulator::Stop(Seconds(20));
+    Simulator::Stop(Seconds(10.9));
     Simulator::Run();
     Simulator::Destroy();
 

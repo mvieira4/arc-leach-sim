@@ -20,15 +20,15 @@ namespace ns3{
 
         m_socket = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(5.0);
+        m_interval = Seconds(10.0);
         m_sent = 0;
         m_received = 0;
-
-        m_packetSize = 1024;
-
-        m_port = 5;
-
-        m_agroPacket = Create<Packet>();
+        m_count = 0;
+        m_dataSize = 0;
+        m_size = 10;
+        m_data = nullptr;
+        m_energyModel = nullptr;
+        m_packet = nullptr;
     }
 
 
@@ -38,6 +38,10 @@ namespace ns3{
 
         m_socket = nullptr;
         m_sendEvent = EventId();
+
+        delete[] m_data;
+        m_data = nullptr;
+        m_dataSize = 0;
     }
     
 
@@ -109,40 +113,40 @@ namespace ns3{
 
 
     void LeachNodeApplication::ExecuteRound(){
-    
-        if(m_isCh){
+        if(m_isCh){ 
             Advertise();
         }
-
-        ReportEvent();
 
         ScheduleNextRound(m_interval);
     }
 
 
 
-    void LeachNodeApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
+    void LeachNodeApplication::ScheduleTransmit(Time dt, Ipv4Address address){
         NS_LOG_FUNCTION(this << dt);
 
-        m_sendEvent = Simulator::Schedule(dt, &LeachNodeApplication::Send, this, packet, address);
+        m_sendEvent = Simulator::Schedule(dt, &LeachNodeApplication::Send, this, address);
     }
 
 
 
-    void LeachNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
+    void LeachNodeApplication::Send(Ipv4Address address){
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
             NS_LOG_DEBUG("State: OFF");
             return;
         }
 
 
+        Ptr<Packet> packet = Create<Packet>(m_size);
+
+        m_socket->Bind();
         m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
         m_sent++;
 
 
-        m_txTrace(packet);
-        m_rxTraceWithAddresses(packet, m_localAddress, address);
+        m_txTrace(m_packet);
+        m_rxTraceWithAddresses(m_packet, m_localAddress, address);
 
         NS_LOG_INFO("-------PACKET SENT------");
         NS_LOG_INFO("From ip " << m_localAddress << " at time " 
@@ -162,9 +166,9 @@ namespace ns3{
         Ptr<Packet> packet;
         Address from;
         Address localAddress;
-        DeviceNameTag tag;
 
         while ((packet = socket->RecvFrom(from))){
+            packet = socket->RecvFrom(from);
 
             socket->GetSockName(localAddress);
 
@@ -182,39 +186,23 @@ namespace ns3{
             NS_LOG_INFO("------------------------");
             NS_LOG_INFO("");
 
-
-            if(packet != nullptr){
-                packet->PeekPacketTag(tag);
-                NS_LOG_INFO("-------PACKET TAG-------");
-                NS_LOG_DEBUG("Packet Tag: " << tag.GetDeviceName());
-                NS_LOG_DEBUG("From: " << from);
-                NS_LOG_INFO("------------------------");
-                NS_LOG_INFO("");
-            }
-
-        }
-
-        std::string name = tag.GetDeviceName();
-
-        if(m_isCh && name == "RE"){
-            m_agroPacket->AddAtEnd(packet);
-        }
-        else if(name == "AD"){
-            m_chAddress = Ipv4Address::ConvertFrom(from);
         }
     }
 
 
 
+    void LeachNodeApplication::FindCh(){
+        NS_LOG_FUNCTION(this << m_socket);
+    }
+
+
+
     void LeachNodeApplication::Advertise(){
-        NS_LOG_FUNCTION(this);
+        NS_LOG_INFO("------EXECUTE ROUND-----");
+        NS_LOG_INFO("------------------------");
+        NS_LOG_INFO("");
 
-        DeviceNameTag tag;
-        tag.SetDeviceName("AD");
-
-        Ptr<Packet> packet;
-        packet = Create<Packet>(m_packetSize);
-        packet->AddPacketTag(tag);
+        m_packet = Create<Packet>(m_size);
 
         Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
 
@@ -224,30 +212,15 @@ namespace ns3{
 
             if(address != m_localAddress){
 
-                ScheduleTransmit(MilliSeconds(20*i), packet, address);
+                ScheduleTransmit(Seconds(i), address);
             }
         }
     }
 
 
 
-
     void LeachNodeApplication::ReportEvent(){
         NS_LOG_FUNCTION(this);
-
-        Ipv4Address address = m_chAddress;
-        if(m_chAddress != nullptr){
-            
-            DeviceNameTag tag;
-            tag.SetDeviceName("RE");
-
-            Ptr<Packet> packet;
-            packet = Create<Packet>(m_packetSize);
-            packet->AddPacketTag(tag);
-            ScheduleTransmit(MilliSeconds(20), packet, address);
-        }
-        else{
-        }
     }
 
 
