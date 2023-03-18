@@ -15,18 +15,25 @@
 namespace ns3{
     NS_LOG_COMPONENT_DEFINE("LeachNodeApplication");
     
-    LeachNodeApplication::LeachNodeApplication(): m_lossCounter(0){
+    LeachNodeApplication::LeachNodeApplication(bool isCh, bool isMal): m_lossCounter(0){
         NS_LOG_FUNCTION(this);
+
+        m_isCh = isCh;
+        m_isMal = isMal;
 
         m_socket = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(5.0);
+        m_interval = Seconds(0.2);
+
         m_sent = 0;
         m_received = 0;
 
+        m_completeEvents = 0;
+        m_roundEvents = 5;
+
         m_packetSize = 1024;
 
-        m_port = 5;
+        m_port = 50;
 
         m_agroPacket = Create<Packet>();
     }
@@ -53,6 +60,8 @@ namespace ns3{
                             MakeDoubleAccessor(&LeachNodeApplication::m_isCh), MakeBooleanChecker())
             .AddAttribute("IsMal", "If node is malicious", BooleanValue(false), 
                             MakeDoubleAccessor(&LeachNodeApplication::m_isMal), MakeBooleanChecker())
+            .AddAttribute("RoundEvents", "Number of evnets in a round", IntegerValue(5), 
+                            MakeDoubleAccessor(&LeachNodeApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
             .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&LeachNodeApplication::m_rxTrace),
                             "Packet::TracedCallback")
             .AddTraceSource("RxWithAddresses", "A packet has been sent",
@@ -82,6 +91,7 @@ namespace ns3{
 
         Ptr<Ipv4> ipv4 = m_node->GetObject<Ipv4>();
         m_localAddress = ipv4->GetAddress (1, 0).GetLocal();
+        m_chAddress = m_localAddress;
 
         TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
         m_socket = Socket::CreateSocket(GetNode(), tid);
@@ -114,9 +124,9 @@ namespace ns3{
             Advertise();
         }
 
-        ReportEvent();
+        //ReportEvent();
 
-        ScheduleNextRound(m_interval);
+        //ScheduleNextRound(m_interval);
     }
 
 
@@ -124,22 +134,24 @@ namespace ns3{
     void LeachNodeApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << dt);
 
+        NS_LOG_DEBUG(address);
+
         m_sendEvent = Simulator::Schedule(dt, &LeachNodeApplication::Send, this, packet, address);
     }
 
 
 
     void LeachNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
+        NS_LOG_FUNCTION(address);
+
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
             NS_LOG_DEBUG("State: OFF");
             return;
         }
 
-
         m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
         m_sent++;
-
 
         m_txTrace(packet);
         m_rxTraceWithAddresses(packet, m_localAddress, address);
@@ -190,18 +202,28 @@ namespace ns3{
                 NS_LOG_DEBUG("From: " << from);
                 NS_LOG_INFO("------------------------");
                 NS_LOG_INFO("");
+
+                std::string name = tag.GetDeviceName();
+
+                if(m_isCh && name == "RE"){
+                    m_agroPacket->AddAtEnd(packet);
+                    NS_LOG_DEBUG("Append to pakcet");
+                    NS_LOG_DEBUG("");
+                }
+                else if(!m_isCh && name == "AD" && m_localAddress == m_chAddress){
+                    m_chAddress = InetSocketAddress::ConvertFrom(from).GetIpv4();
+                    NS_LOG_DEBUG("Set cluster head");
+                    NS_LOG_DEBUG("");
+                }
             }
 
         }
+    }
 
-        std::string name = tag.GetDeviceName();
-
-        if(m_isCh && name == "RE"){
-            m_agroPacket->AddAtEnd(packet);
-        }
-        else if(name == "AD"){
-            m_chAddress = Ipv4Address::ConvertFrom(from);
-        }
+    void LeachNodeApplication::ScheduleNextEvent(Time dt){
+        NS_LOG_FUNCTION(this);
+        
+        Simulator::Schedule(m_interval, &LeachNodeApplication::ReportEvent, this);
     }
 
 
@@ -222,6 +244,7 @@ namespace ns3{
             Ptr<Ipv4> ipv4= channel->GetDevice(i)->GetNode()->GetObject<Ipv4>();
             Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
 
+            NS_LOG_DEBUG(address);
             if(address != m_localAddress){
 
                 ScheduleTransmit(MilliSeconds(20*i), packet, address);
@@ -236,17 +259,19 @@ namespace ns3{
         NS_LOG_FUNCTION(this);
 
         Ipv4Address address = m_chAddress;
-        if(m_chAddress != nullptr){
-            
-            DeviceNameTag tag;
-            tag.SetDeviceName("RE");
+        NS_LOG_DEBUG(address);
 
-            Ptr<Packet> packet;
-            packet = Create<Packet>(m_packetSize);
-            packet->AddPacketTag(tag);
-            ScheduleTransmit(MilliSeconds(20), packet, address);
-        }
-        else{
+        DeviceNameTag tag;
+        tag.SetDeviceName("RE");
+
+        Ptr<Packet> packet;
+        packet = Create<Packet>(m_packetSize);
+        packet->AddPacketTag(tag);
+
+        ScheduleTransmit(MilliSeconds(20), packet, address);
+
+        if(m_completeEvents < m_roundEvents){
+            ScheduleNextEvent(m_interval);
         }
     }
 

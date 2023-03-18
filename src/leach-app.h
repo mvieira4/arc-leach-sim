@@ -21,7 +21,7 @@ const uint16_t PORT_NUM = 5000;
 namespace ns3{
     class LeachNodeApplication: public Application{
         public:
-            LeachNodeApplication();
+            LeachNodeApplication(bool isCh = true, bool isMal = false);
 
             ~LeachNodeApplication();
 
@@ -63,7 +63,11 @@ namespace ns3{
 
             void FindCh();
 
+            void ScheduleAdvertise();
+
             void Advertise();
+
+            void ScheduleNextEvent(Time dt);
 
             void ReportEvent();
 
@@ -97,6 +101,9 @@ namespace ns3{
 
             uint32_t m_port;
             uint32_t m_packetSize;
+
+            uint32_t m_completeEvents;
+            uint32_t m_roundEvents;
 
             Ptr<Packet> m_agroPacket;
 
