@@ -119,14 +119,17 @@ namespace ns3{
 
 
     void LeachNodeApplication::ExecuteRound(){
+        NS_LOG_FUNCTION(this);
     
         if(m_isCh){
             Advertise();
         }
 
-        //ReportEvent();
+        ScheduleNextEvent(Seconds(0));
 
         //ScheduleNextRound(m_interval);
+
+        m_chAddress = m_localAddress;
     }
 
 
@@ -268,7 +271,7 @@ namespace ns3{
         packet = Create<Packet>(m_packetSize);
         packet->AddPacketTag(tag);
 
-        ScheduleTransmit(MilliSeconds(20), packet, address);
+        ScheduleTransmit(m_interval, packet, address);
 
         if(m_completeEvents < m_roundEvents){
             ScheduleNextEvent(m_interval);
