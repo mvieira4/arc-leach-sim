@@ -28,20 +28,17 @@ namespace ns3{
 
         m_port = 5;
 
-        m_agroPacket = Create<Packet>();
+        m_agroPacket = nullptr;
     }
-
-
 
     LeachNodeApplication::~LeachNodeApplication(){
         NS_LOG_FUNCTION(this);
 
         m_socket = nullptr;
         m_sendEvent = EventId();
+
+        m_agroPacket = nullptr;
     }
-    
-
-
 
     // Methods
     TypeId LeachNodeApplication::GetTypeId(){
@@ -67,21 +64,19 @@ namespace ns3{
         return tid;
     }
 
-
-
     void LeachNodeApplication::DoDispose(){
         NS_LOG_FUNCTION(this);
 
         Application::DoDispose();
     }
 
-
-
     void LeachNodeApplication::StartApplication(){
         NS_LOG_FUNCTION(this);
 
         Ptr<Ipv4> ipv4 = m_node->GetObject<Ipv4>();
         m_localAddress = ipv4->GetAddress (1, 0).GetLocal();
+
+        m_agroPacket = Create<Packet>();
 
         TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
         m_socket = Socket::CreateSocket(GetNode(), tid);
@@ -99,22 +94,23 @@ namespace ns3{
 
 
 
-    void LeachNodeApplication::ScheduleNextRound(Time dt){
+    void LeachNodeApplication::ScheduleNextEvent(Time dt){
         NS_LOG_FUNCTION(this << dt);
+
         m_received = 0;
 
         m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
     }
 
-
-
     void LeachNodeApplication::ExecuteRound(){
+        NS_LOG_FUNCTION(this)
     
         if(m_isCh){
-            Advertise();
+            ScheduleAdvertise();
         }
 
-        ReportEvent();
+
+        ScheduleNextEvent(m_interval);
 
         ScheduleNextRound(m_interval);
     }
@@ -162,7 +158,7 @@ namespace ns3{
         Ptr<Packet> packet;
         Address from;
         Address localAddress;
-        DeviceNameTag tag;
+        //DeviceNameTag tag;
 
         while ((packet = socket->RecvFrom(from))){
 
@@ -190,31 +186,36 @@ namespace ns3{
                 NS_LOG_DEBUG("From: " << from);
                 NS_LOG_INFO("------------------------");
                 NS_LOG_INFO("");
+
+                /*
+                std::string name = tag.GetDeviceName();
+                if(m_isCh && name == "RE"){
+                    m_agroPacket->AddAtEnd(packet);
+                }
+                else if(name == "AD"){
+                    m_chAddress = Ipv4Address::ConvertFrom(from);
+                }
+                */
             }
-
-        }
-
-        std::string name = tag.GetDeviceName();
-
-        if(m_isCh && name == "RE"){
-            m_agroPacket->AddAtEnd(packet);
-        }
-        else if(name == "AD"){
-            m_chAddress = Ipv4Address::ConvertFrom(from);
         }
     }
 
 
+    void LeachNodeApplication::ScheduleAdvertise(){
+        NS_LOG_FUNCTION(this);
+
+        Simulator::Schedule(Seconds(0), &LeachNodeApplication::Advertise, this);
+    }
 
     void LeachNodeApplication::Advertise(){
         NS_LOG_FUNCTION(this);
 
-        DeviceNameTag tag;
-        tag.SetDeviceName("AD");
+        //DeviceNameTag tag;
+        //tag.SetDeviceName("AD");
 
         Ptr<Packet> packet;
         packet = Create<Packet>(m_packetSize);
-        packet->AddPacketTag(tag);
+        //packet->AddPacketTag(tag);
 
         Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
 
@@ -230,6 +231,11 @@ namespace ns3{
     }
 
 
+    void LeachNodeApplication::ScheduleNextEvent(Time dt){
+        NS_LOG_FUNCTION(this);
+
+        Simulator::Schedule(dt, &LeachNodeApplication::ReportEvent, this)
+    }
 
 
     void LeachNodeApplication::ReportEvent(){
@@ -248,6 +254,8 @@ namespace ns3{
         }
         else{
         }
+
+        if(m_completeRoundN m_roundEventN)
     }
 
 

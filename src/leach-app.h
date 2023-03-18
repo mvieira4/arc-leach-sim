@@ -57,15 +57,20 @@ namespace ns3{
 
             void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
 
+            void ScheduleNextEvent(Time dt);
+
+            void ReportEvent();
+
             void Send(Ptr<Packet>, Ipv4Address);
 
             void HandleRead(Ptr<Socket> socket);
 
-            void FindCh();
+            void SchduleAdvertise(Time dt);
 
             void Advertise();
 
-            void ReportEvent();
+            uint32_t m_roundEventN;
+            uint32_t m_completEventN;
 
             Ptr<Socket> m_socket;
 
