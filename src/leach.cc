@@ -48,8 +48,8 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_INFO);
-        LogComponentEnable("LeachNodeHelper", LOG_LEVEL_INFO);
+        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
+        //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
     }
 
     // Create Nodes
@@ -118,7 +118,7 @@ int main(int argc, char* argv[]){
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
     // Run Sim
-    Simulator::Stop(Seconds(10.9));
+    Simulator::Stop(Seconds(2.5));
     Simulator::Run();
     Simulator::Destroy();
 

@@ -21,7 +21,7 @@ const uint16_t PORT_NUM = 5000;
 namespace ns3{
     class LeachNodeApplication: public Application{
         public:
-            LeachNodeApplication();
+            LeachNodeApplication(bool isCh = true, bool isMal = false);
 
             ~LeachNodeApplication();
 
@@ -67,10 +67,18 @@ namespace ns3{
 
             void SchduleAdvertise(Time dt);
 
+            void ScheduleAdvertise();
+
             void Advertise();
 
+<<<<<<< HEAD
             uint32_t m_roundEventN;
             uint32_t m_completEventN;
+=======
+            void ScheduleNextEvent(Time dt);
+
+            void ReportEvent();
+>>>>>>> 41d7cfb (Added cluster head assignment)
 
             Ptr<Socket> m_socket;
 
@@ -102,6 +110,9 @@ namespace ns3{
 
             uint32_t m_port;
             uint32_t m_packetSize;
+
+            uint32_t m_completeEvents;
+            uint32_t m_roundEvents;
 
             Ptr<Packet> m_agroPacket;
 
