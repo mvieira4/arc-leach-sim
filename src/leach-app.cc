@@ -113,20 +113,30 @@ namespace ns3{
     }
 
     void LeachNodeApplication::ExecuteRound(){
+<<<<<<< HEAD
         NS_LOG_FUNCTION(this)
+=======
+        NS_LOG_FUNCTION(this);
+>>>>>>> ad51ca0 (Added event scheduler)
     
         if(m_isCh){
             ScheduleAdvertise();
         }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
         ScheduleNextEvent(m_interval);
 =======
         //ReportEvent();
 >>>>>>> 41d7cfb (Added cluster head assignment)
+=======
+        ScheduleNextEvent(Seconds(0));
+>>>>>>> ad51ca0 (Added event scheduler)
 
         //ScheduleNextRound(m_interval);
+
+        m_chAddress = m_localAddress;
     }
 
 
@@ -292,7 +302,7 @@ namespace ns3{
         packet = Create<Packet>(m_packetSize);
         packet->AddPacketTag(tag);
 
-        ScheduleTransmit(MilliSeconds(20), packet, address);
+        ScheduleTransmit(m_interval, packet, address);
 
         if(m_completeEvents < m_roundEvents){
             ScheduleNextEvent(m_interval);
