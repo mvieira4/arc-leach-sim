@@ -9,6 +9,7 @@
 #include "ns3/packet-socket-factory.h"
 #include "ns3/yans-wifi-helper.h"
 #include "ns3/basic-energy-source.h"
+#include "ns3/wifi-net-device.h"
 
 #include "leach-app.h"
 
@@ -29,7 +30,10 @@ namespace ns3{
         m_received = 0;
 
         m_completeEvents = 0;
-        m_roundEvents = 5;
+        m_roundEvents = 2;
+
+        m_maxRounds = 2;
+        m_rounds = 0;
 
         m_packetSize = 1024;
 
@@ -113,23 +117,33 @@ namespace ns3{
         NS_LOG_FUNCTION(this << dt);
         m_received = 0;
 
-        m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+        if(m_rounds < m_maxRounds){
+            m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+        }
+
+        m_rounds++;
     }
 
 
 
     void LeachNodeApplication::ExecuteRound(){
         NS_LOG_FUNCTION(this);
-    
+
+        NS_LOG_DEBUG("---------ROUND--------");
+        NS_LOG_DEBUG("Round: " << m_rounds);
+        NS_LOG_DEBUG("----------------------");
+        NS_LOG_DEBUG("");
+
         if(m_isCh){
             Advertise();
         }
 
         ScheduleNextEvent(Seconds(0));
 
-        //ScheduleNextRound(m_interval);
+        ScheduleNextRound(m_interval);
 
         m_chAddress = m_localAddress;
+        m_completeEvents = 0;
     }
 
 
@@ -148,7 +162,7 @@ namespace ns3{
         NS_LOG_FUNCTION(address);
 
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
-            NS_LOG_DEBUG("State: OFF");
+            //NS_LOG_DEBUG("State: OFF");
             return;
         }
 
@@ -271,10 +285,28 @@ namespace ns3{
         packet = Create<Packet>(m_packetSize);
         packet->AddPacketTag(tag);
 
-        ScheduleTransmit(m_interval, packet, address);
+        if(m_isCh){
+            
+        }
+        else{
+            ScheduleTransmit(m_interval, packet, address);
+        }
+
+        m_completeEvents++;
+
+        NS_LOG_DEBUG("---------COMPLETE---------");
+        NS_LOG_DEBUG("Complete: " << m_completeEvents);
+        NS_LOG_DEBUG("--------------------------");
 
         if(m_completeEvents < m_roundEvents){
             ScheduleNextEvent(m_interval);
+            NS_LOG_DEBUG("Schedule next event");
+            NS_LOG_DEBUG("");
+        }
+        else if (m_isCh){
+            ScheduleTransmit(m_interval, m_agroPacket, m_sinkAddress);
+            NS_LOG_DEBUG("Schedule transmit to sink");
+            NS_LOG_DEBUG("");
         }
     }
 
@@ -289,43 +321,78 @@ namespace ns3{
     }
 
 
-
-
     // Getters & Setters
     void LeachNodeApplication::SetInterval(Time time){
+        NS_LOG_FUNCTION(this);
+
         m_interval = time;
     }
 
     Time LeachNodeApplication::GetInterval(){
+        NS_LOG_FUNCTION(this);
+
         return m_interval;
     }
 
     void LeachNodeApplication::SetIsCh(bool x){
+        NS_LOG_FUNCTION(this);
+
         m_isCh = x;
     }
 
-
     bool LeachNodeApplication::GetIsCh(){
+        NS_LOG_FUNCTION(this);
+
         return m_isCh;
     }
 
     void LeachNodeApplication::SetIsMal(bool x){
+        NS_LOG_FUNCTION(this);
+
         m_isMal = x;
     }
 
 
     bool LeachNodeApplication::GetIsMal(){
+        NS_LOG_FUNCTION(this);
+
         return m_isMal;
     }
 
+    void LeachNodeApplication::SetMaxRounds(uint32_t rounds){
+        NS_LOG_DEBUG(this);
+        
+        m_maxRounds = rounds;
+    }
+
+    uint32_t LeachNodeApplication::GetMaxRounds(){
+        NS_LOG_DEBUG(this);
+
+        return m_maxRounds;
+    }
+
+    void LeachNodeApplication::SetRoundEvents(uint32_t events){
+        NS_LOG_DEBUG(this);
+
+        m_roundEvents = events;
+    }
+
+    uint32_t LeachNodeApplication::GetRoundEvents(){
+        NS_LOG_DEBUG(this);
+
+        return m_roundEvents;
+    }
+
     void LeachNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
+        NS_LOG_FUNCTION(this);
+
         m_energyModel = DynamicCast<WifiRadioEnergyModel>(model);
     }
 
     Ptr<WifiRadioEnergyModel> LeachNodeApplication::GetEnergyModel(){
+        NS_LOG_FUNCTION(this);
+
         return m_energyModel;
     }
-
-
 
 } // ns3

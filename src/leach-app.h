@@ -39,6 +39,14 @@ namespace ns3{
 
             bool GetIsMal();
 
+            void SetMaxRounds(uint32_t rounds);
+
+            uint32_t GetMaxRounds();
+
+            void SetRoundEvents(uint32_t events);
+
+            uint32_t GetRoundEvents();
+
             void SetEnergyModel(Ptr<DeviceEnergyModel> model);
 
             Ptr<WifiRadioEnergyModel> GetEnergyModel();
@@ -104,6 +112,9 @@ namespace ns3{
 
             uint32_t m_completeEvents;
             uint32_t m_roundEvents;
+
+            uint32_t m_maxRounds;
+            uint32_t m_rounds;
 
             Ptr<Packet> m_agroPacket;
 

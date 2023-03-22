@@ -22,6 +22,8 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
+#include "ns3/gnuplot-helper.h"
+#include "ns3/file-helper.h"
 
 #include "ns3/leach-helper.h"
 
@@ -29,7 +31,7 @@ using namespace ns3;
 
 int main(int argc, char* argv[]){
     bool verbose = true;
-    int nWifi = 5;
+    int nWifi = 3;
 
     if (verbose){
         //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
@@ -82,8 +84,8 @@ int main(int argc, char* argv[]){
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(.01),
-                                  "DeltaY", DoubleValue(.01),
+                                  "DeltaX", DoubleValue(1.0),
+                                  "DeltaY", DoubleValue(1.0),
                                   "GridWidth", UintegerValue(1),
                                   "LayoutType", StringValue("RowFirst"));
 
@@ -106,7 +108,6 @@ int main(int argc, char* argv[]){
     WifiRadioEnergyModelHelper energyModel;
     DeviceEnergyModelContainer energyModels = energyModel.Install(devices, batteries);
 
-
     LeachNodeHelper nodeLeach(nWifi);
 
     ApplicationContainer nodeApps = nodeLeach.Install(nodes, energyModels);
@@ -117,8 +118,34 @@ int main(int argc, char* argv[]){
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
+
+    std::string probeType = "ns3::Ipv4PacketProbe";
+    std::string tracePath = "/NodeList/*/$ns3::Ipv4L3Protocol/Tx";
+
+    GnuplotHelper plot;
+    plot.ConfigurePlot("leach-node-plot", "Nodes Alive vs Time", "Time", "Nodes Alive");
+
+    plot.PlotProbe(probeType,
+                         tracePath,
+                         "OutputBytes",
+                         "Packet Byte Count",
+                         GnuplotAggregator::KEY_BELOW);
+
+    // Use FileHelper to write out the packet byte count over time
+    FileHelper fileHelper;
+
+    // Configure the file to be written, and the formatting of output data.
+    fileHelper.ConfigureFile("seventh-packet-byte-count", FileAggregator::FORMATTED);
+
+    // Set the labels for this formatted output file.
+    fileHelper.Set2dFormat("Time (Seconds) = %.3e\tPacket Byte Count = %.0f");
+
+    // Specify the probe type, trace source path (in configuration namespace), and
+    // probe output trace source ("OutputBytes") to write.
+    fileHelper.WriteProbe(probeType, tracePath, "OutputBytes");
+
     // Run Sim
-    Simulator::Stop(Seconds(2.5));
+    Simulator::Stop(Seconds(10.0));
     Simulator::Run();
     Simulator::Destroy();
 
