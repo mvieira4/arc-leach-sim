@@ -81,6 +81,7 @@ namespace ns3{
                                     const Address&> m_rxTraceWithAddresses;
             TracedCallback<Ptr<const Packet>, const Address&, 
                                     const Address&> m_txTraceWithAddresses;
+            TracedCallback<> m_energyTrace;
 
             EventId m_sendEvent;
             EventId m_roundEvent;
@@ -106,6 +107,8 @@ namespace ns3{
 
             uint32_t m_rounds;
             uint32_t m_roundN;
+
+            uint32_t m_executedRounds;
 
             Ptr<Packet> m_agroPacket;
 

@@ -22,7 +22,6 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
-
 #include "ns3/leach-helper.h"
 
 using namespace ns3;
@@ -30,13 +29,27 @@ using namespace ns3;
 void SendCb(Ptr<const Packet> packet){
     std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
     std::cout << "Sent" << std::endl;
+    std::cout << Simulator::Now().GetSeconds() << std::endl;
     std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
 }
 
 void RecvCb(Ptr<const Packet> packet){
     std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
     std::cout << "Recv" << std::endl;
+    std::cout << Simulator::Now().GetSeconds() << std::endl;
     std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
+}
+
+void EnergyCb(){
+    std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    std::cout << "Energy Change" << std::endl;
+    std::cout << Simulator::Now().GetSeconds() << std::endl;
+    std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
+}
+
+
+void RipCb(){
+
 }
 
 
@@ -61,7 +74,6 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-
         LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
         //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
     }
@@ -84,7 +96,7 @@ int main(int argc, char* argv[]){
 
     WifiHelper wifi;
     wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
-    //wifi.SetStandard(WIFI_STANDARD_80211b); // 2.4GHz
+    wifi.SetStandard(WIFI_STANDARD_80211b); // 2.4GHz
 
     NetDeviceContainer devices = wifi.Install(phy, mac, nodes);
 
@@ -96,8 +108,8 @@ int main(int argc, char* argv[]){
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(.01),
-                                  "DeltaY", DoubleValue(.01),
+                                  "DeltaX", DoubleValue(1.0),
+                                  "DeltaY", DoubleValue(1.0),
                                   "GridWidth", UintegerValue(1),
                                   "LayoutType", StringValue("RowFirst"));
 
@@ -126,16 +138,18 @@ int main(int argc, char* argv[]){
     ApplicationContainer nodeApps = nodeLeach.Install(nodes, energyModels);
 
     nodeApps.Start(Seconds(1));
-    nodeApps.Stop(Seconds(5));
+    nodeApps.Stop(Seconds(20));
 
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Rx", MakeCallback(&RecvCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/RemainingEnergy",
+            MakeCallback(&EnergyCb));
 
     // Run Sim
-    Simulator::Stop(Seconds(2.5));
+    Simulator::Stop(Seconds(20));
     Simulator::Run();
     Simulator::Destroy();
 

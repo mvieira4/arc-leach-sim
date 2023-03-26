@@ -29,10 +29,12 @@ namespace ns3{
         m_received = 0;
 
         m_roundEventN = 0;
-        m_roundEvents = 3;
+        m_roundEvents = 50;
 
         m_roundN = 0;
-        m_rounds = 1;
+        m_rounds = 50;
+
+        m_executedRounds = 0;
 
         m_packetSize = 1024;
 
@@ -71,9 +73,9 @@ namespace ns3{
                             "Packet::TwoAddressTracedCallback")
             .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&LeachNodeApplication::m_txTrace),
                             "Packet::TracedCallback")
-            .AddTraceSource("TxWithAddresses", "A packet has been sent",
-                            MakeTraceSourceAccessor(&LeachNodeApplication::m_txTraceWithAddresses),
-                            "Packet::TwoAddressTracedCallback");
+            .AddTraceSource("RemainingEnergy", "Energy change callback",
+                            MakeTraceSourceAccessor(&LeachNodeApplication::m_energyTrace),
+                            "TracedValueCallback::Double");
 
         return tid;
     }
@@ -133,9 +135,7 @@ namespace ns3{
         TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
         m_socket = Socket::CreateSocket(GetNode(), tid);
         m_socket->SetAllowBroadcast(true);
-        m_socket->BindToNetDevice(GetNode()->GetDevice(0));
-        m_socket->Bind(InetSocketAddress(m_localAddress, m_port));
-        m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
+        m_socket->BindToNetDevice(GetNode()->GetDevice(0)); m_socket->Bind(InetSocketAddress(m_localAddress, m_port)); m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
         m_socket->Listen();
 
         Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket> (m_socket);
@@ -164,8 +164,8 @@ namespace ns3{
     void LeachNodeApplication::Advertise(){
         NS_LOG_FUNCTION(this);
 
-        //DeviceNameTag tag;
-        //tag.SetDeviceName("AD");
+        DeviceNameTag tag;
+        tag.SetDeviceName("AD");
 
         Ptr<Packet> packet;
         packet = Create<Packet>(m_packetSize);
@@ -190,28 +190,24 @@ namespace ns3{
     void LeachNodeApplication::ScheduleNextRound(Time dt){
         NS_LOG_FUNCTION(this);
 
+        if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
+            return;
+        }
+
         if(m_roundN < m_rounds){
             m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
 
-            m_roundN++;
         }
+
+        m_roundN++;
     }
 
 
-    void LeachNodeApplication::ScheduleNextEvent(Time dt){
-        NS_LOG_FUNCTION(this << dt);
-
-        m_received = 0;
-
-        if(m_roundEventN < m_roundEvents){
-            m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
-
-            m_roundEventN++;
-        }
-    }
 
     void LeachNodeApplication::ExecuteRound(){
         NS_LOG_FUNCTION(this);
+
+        m_executedRounds++;
     
         if(m_isCh){
             ScheduleAdvertise(Seconds(0));
@@ -226,6 +222,40 @@ namespace ns3{
     }
 
 
+    void LeachNodeApplication::ScheduleNextEvent(Time dt){
+        NS_LOG_FUNCTION(this << dt);
+
+        m_received = 0;
+
+        if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
+            return;
+        }
+
+        if(m_roundEventN < m_roundEvents){
+            m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ReportEvent, this);
+        }
+
+        m_roundEventN++;
+    }
+
+    void LeachNodeApplication::ReportEvent(){
+        NS_LOG_FUNCTION(this);
+
+        Ipv4Address address = m_chAddress;
+        NS_LOG_DEBUG(address);
+
+        DeviceNameTag tag;
+        tag.SetDeviceName("RE");
+
+        Ptr<Packet> packet;
+        packet = Create<Packet>(m_packetSize);
+        packet->AddPacketTag(tag);
+
+        ScheduleTransmit(m_interval, packet, address);
+
+        ScheduleNextEvent(m_interval);
+
+    }
 
     void LeachNodeApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << dt);
@@ -242,6 +272,7 @@ namespace ns3{
 
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
             NS_LOG_DEBUG("State: OFF");
+            m_energyTrace();
             return;
         }
 
@@ -252,8 +283,9 @@ namespace ns3{
         m_txTrace(packet);
         m_rxTraceWithAddresses(packet, m_localAddress, address);
 
-        NS_LOG_INFO("-------PACKET SENT------");
-        NS_LOG_INFO("From ip " << m_localAddress << " at time " 
+        NS_LOG_DEBUG("-------PACKET SENT------");
+        NS_LOG_DEBUG("Round: " << m_executedRounds);
+        NS_LOG_DEBUG("From ip " << m_localAddress << " at time " 
                             << Simulator::Now().As(Time::S) << " to "
                             << address);
         NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
@@ -315,35 +347,5 @@ namespace ns3{
 
         }
     }
-
-
-
-    void LeachNodeApplication::ReportEvent(){
-        NS_LOG_FUNCTION(this);
-
-        Ipv4Address address = m_chAddress;
-        NS_LOG_DEBUG(address);
-
-        DeviceNameTag tag;
-        tag.SetDeviceName("RE");
-
-        Ptr<Packet> packet;
-        packet = Create<Packet>(m_packetSize);
-        packet->AddPacketTag(tag);
-
-        ScheduleTransmit(m_interval, packet, address);
-
-        if(m_roundEventN < m_roundEvents){
-            ScheduleNextEvent(m_interval);
-            m_roundEventN++;
-        }
-
-    }
-
-
-
-
-
-
 
 } // ns3
