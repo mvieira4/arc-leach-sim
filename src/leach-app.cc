@@ -28,8 +28,11 @@ namespace ns3{
         m_sent = 0;
         m_received = 0;
 
-        m_completeEvents = 0;
-        m_roundEvents = 5;
+        m_roundEventN = 0;
+        m_roundEvents = 3;
+
+        m_roundN = 0;
+        m_rounds = 1;
 
         m_packetSize = 1024;
 
@@ -37,6 +40,7 @@ namespace ns3{
 
         m_agroPacket = nullptr;
     }
+
 
     LeachNodeApplication::~LeachNodeApplication(){
         NS_LOG_FUNCTION(this);
@@ -47,7 +51,8 @@ namespace ns3{
         m_agroPacket = nullptr;
     }
 
-    // Methods
+
+    // Getters & Setters
     TypeId LeachNodeApplication::GetTypeId(){
         static TypeId tid = TypeId("ns3::LeachNodeApplication")
             .SetParent<Application>()
@@ -73,11 +78,48 @@ namespace ns3{
         return tid;
     }
 
+    void LeachNodeApplication::SetInterval(Time time){
+        m_interval = time;
+    }
+
+    Time LeachNodeApplication::GetInterval(){
+        return m_interval;
+    }
+
+    void LeachNodeApplication::SetIsCh(bool x){
+        m_isCh = x;
+    }
+
+
+    bool LeachNodeApplication::GetIsCh(){
+        return m_isCh;
+    }
+
+    void LeachNodeApplication::SetIsMal(bool x){
+        m_isMal = x;
+    }
+
+
+    bool LeachNodeApplication::GetIsMal(){
+        return m_isMal;
+    }
+
+    void LeachNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
+        m_energyModel = DynamicCast<WifiRadioEnergyModel>(model);
+    }
+
+    Ptr<WifiRadioEnergyModel> LeachNodeApplication::GetEnergyModel(){
+        return m_energyModel;
+    }
+
+
+    // Methods
     void LeachNodeApplication::DoDispose(){
         NS_LOG_FUNCTION(this);
 
         Application::DoDispose();
     }
+
 
     void LeachNodeApplication::StartApplication(){
         NS_LOG_FUNCTION(this);
@@ -103,38 +145,82 @@ namespace ns3{
     }
 
 
+    void LeachNodeApplication::StopApplication(){
+        NS_LOG_FUNCTION(this);
+     
+        if (m_socket){
+            m_socket->SetRecvCallback(MakeNullCallback<void, Ptr<Socket>>());
+        }
+    }
+
+
+    void LeachNodeApplication::ScheduleAdvertise(Time dt){
+        NS_LOG_FUNCTION(this);
+
+        Simulator::Schedule(Seconds(0), &LeachNodeApplication::Advertise, this);
+    }
+
+
+    void LeachNodeApplication::Advertise(){
+        NS_LOG_FUNCTION(this);
+
+        //DeviceNameTag tag;
+        //tag.SetDeviceName("AD");
+
+        Ptr<Packet> packet;
+        packet = Create<Packet>(m_packetSize);
+        //packet->AddPacketTag(tag);
+
+        Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
+
+        for (uint32_t i = 0; i < channel->GetNDevices(); i++){
+            Ptr<Ipv4> ipv4= channel->GetDevice(i)->GetNode()->GetObject<Ipv4>();
+            Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
+
+            NS_LOG_DEBUG(address);
+            if(address != m_localAddress){
+
+                ScheduleTransmit(MilliSeconds(20*i), packet, address);
+            }
+        }
+    }
+
+
+
+    void LeachNodeApplication::ScheduleNextRound(Time dt){
+        NS_LOG_FUNCTION(this);
+
+        if(m_roundN < m_rounds){
+            m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+
+            m_roundN++;
+        }
+    }
+
 
     void LeachNodeApplication::ScheduleNextEvent(Time dt){
         NS_LOG_FUNCTION(this << dt);
 
         m_received = 0;
 
-        m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+        if(m_roundEventN < m_roundEvents){
+            m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+
+            m_roundEventN++;
+        }
     }
 
     void LeachNodeApplication::ExecuteRound(){
-<<<<<<< HEAD
-        NS_LOG_FUNCTION(this)
-=======
         NS_LOG_FUNCTION(this);
->>>>>>> ad51ca0 (Added event scheduler)
     
         if(m_isCh){
-            ScheduleAdvertise();
+            ScheduleAdvertise(Seconds(0));
         }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 
-        ScheduleNextEvent(m_interval);
-=======
-        //ReportEvent();
->>>>>>> 41d7cfb (Added cluster head assignment)
-=======
         ScheduleNextEvent(Seconds(0));
->>>>>>> ad51ca0 (Added event scheduler)
 
-        //ScheduleNextRound(m_interval);
+        ScheduleNextRound(m_interval);
 
         m_chAddress = m_localAddress;
     }
@@ -184,7 +270,7 @@ namespace ns3{
         Ptr<Packet> packet;
         Address from;
         Address localAddress;
-        //DeviceNameTag tag;
+        DeviceNameTag tag;
 
         while ((packet = socket->RecvFrom(from))){
 
@@ -213,19 +299,6 @@ namespace ns3{
                 NS_LOG_INFO("------------------------");
                 NS_LOG_INFO("");
 
-<<<<<<< HEAD
-                /*
-                std::string name = tag.GetDeviceName();
-                if(m_isCh && name == "RE"){
-                    m_agroPacket->AddAtEnd(packet);
-                }
-                else if(name == "AD"){
-                    m_chAddress = Ipv4Address::ConvertFrom(from);
-                }
-                */
-            }
-        }
-=======
                 std::string name = tag.GetDeviceName();
 
                 if(m_isCh && name == "RE"){
@@ -243,50 +316,6 @@ namespace ns3{
         }
     }
 
-    void LeachNodeApplication::ScheduleNextEvent(Time dt){
-        NS_LOG_FUNCTION(this);
-        
-        Simulator::Schedule(m_interval, &LeachNodeApplication::ReportEvent, this);
->>>>>>> 41d7cfb (Added cluster head assignment)
-    }
-
-
-    void LeachNodeApplication::ScheduleAdvertise(){
-        NS_LOG_FUNCTION(this);
-
-        Simulator::Schedule(Seconds(0), &LeachNodeApplication::Advertise, this);
-    }
-
-    void LeachNodeApplication::Advertise(){
-        NS_LOG_FUNCTION(this);
-
-        //DeviceNameTag tag;
-        //tag.SetDeviceName("AD");
-
-        Ptr<Packet> packet;
-        packet = Create<Packet>(m_packetSize);
-        //packet->AddPacketTag(tag);
-
-        Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
-
-        for (uint32_t i = 0; i < channel->GetNDevices(); i++){
-            Ptr<Ipv4> ipv4= channel->GetDevice(i)->GetNode()->GetObject<Ipv4>();
-            Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
-
-            NS_LOG_DEBUG(address);
-            if(address != m_localAddress){
-
-                ScheduleTransmit(MilliSeconds(20*i), packet, address);
-            }
-        }
-    }
-
-
-    void LeachNodeApplication::ScheduleNextEvent(Time dt){
-        NS_LOG_FUNCTION(this);
-
-        Simulator::Schedule(dt, &LeachNodeApplication::ReportEvent, this)
-    }
 
 
     void LeachNodeApplication::ReportEvent(){
@@ -304,60 +333,16 @@ namespace ns3{
 
         ScheduleTransmit(m_interval, packet, address);
 
-        if(m_completeEvents < m_roundEvents){
+        if(m_roundEventN < m_roundEvents){
             ScheduleNextEvent(m_interval);
+            m_roundEventN++;
         }
 
-        if(m_completeRoundN m_roundEventN)
-    }
-
-
-
-    void LeachNodeApplication::StopApplication(){
-        NS_LOG_FUNCTION(this);
-     
-        if (m_socket){
-            m_socket->SetRecvCallback(MakeNullCallback<void, Ptr<Socket>>());
-        }
     }
 
 
 
 
-    // Getters & Setters
-    void LeachNodeApplication::SetInterval(Time time){
-        m_interval = time;
-    }
-
-    Time LeachNodeApplication::GetInterval(){
-        return m_interval;
-    }
-
-    void LeachNodeApplication::SetIsCh(bool x){
-        m_isCh = x;
-    }
-
-
-    bool LeachNodeApplication::GetIsCh(){
-        return m_isCh;
-    }
-
-    void LeachNodeApplication::SetIsMal(bool x){
-        m_isMal = x;
-    }
-
-
-    bool LeachNodeApplication::GetIsMal(){
-        return m_isMal;
-    }
-
-    void LeachNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
-        m_energyModel = DynamicCast<WifiRadioEnergyModel>(model);
-    }
-
-    Ptr<WifiRadioEnergyModel> LeachNodeApplication::GetEnergyModel(){
-        return m_energyModel;
-    }
 
 
 

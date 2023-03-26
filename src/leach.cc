@@ -27,9 +27,22 @@
 
 using namespace ns3;
 
+void SendCb(Ptr<const Packet> packet){
+    std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
+    std::cout << "Sent" << std::endl;
+    std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
+}
+
+void RecvCb(Ptr<const Packet> packet){
+    std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
+    std::cout << "Recv" << std::endl;
+    std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
+}
+
+
 int main(int argc, char* argv[]){
     bool verbose = true;
-    int nWifi = 5;
+    int nWifi = 2;
 
     if (verbose){
         //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
@@ -48,6 +61,7 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
+
         LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
         //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
     }
@@ -62,7 +76,7 @@ int main(int argc, char* argv[]){
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 
     YansWifiPhyHelper phy;
-    //phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
+    phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
     phy.SetChannel(channel.Create());
 
     WifiMacHelper mac;
@@ -112,10 +126,13 @@ int main(int argc, char* argv[]){
     ApplicationContainer nodeApps = nodeLeach.Install(nodes, energyModels);
 
     nodeApps.Start(Seconds(1));
-    nodeApps.Stop(Seconds(20));
+    nodeApps.Stop(Seconds(5));
 
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Rx", MakeCallback(&RecvCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
 
     // Run Sim
     Simulator::Stop(Seconds(2.5));

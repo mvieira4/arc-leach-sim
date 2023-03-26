@@ -23,13 +23,13 @@ namespace ns3{
         public:
             LeachNodeApplication(bool isCh = true, bool isMal = false);
 
-            ~LeachNodeApplication();
+            ~LeachNodeApplication() override;
+
+            static TypeId GetTypeId();
 
             void SetInterval(Time time);
 
             Time GetInterval();
-
-            static TypeId GetTypeId();
 
             void SetIsCh(bool x);
 
@@ -51,34 +51,24 @@ namespace ns3{
 
             void StopApplication() override;
 
+            void ScheduleAdvertise(Time dt);
+
+            void Advertise();
+
             void ScheduleNextRound(Time dt);
 
             void ExecuteRound();
 
-            void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
-
             void ScheduleNextEvent(Time dt);
 
             void ReportEvent();
+
+            void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
 
             void Send(Ptr<Packet>, Ipv4Address);
 
             void HandleRead(Ptr<Socket> socket);
 
-            void SchduleAdvertise(Time dt);
-
-            void ScheduleAdvertise();
-
-            void Advertise();
-
-<<<<<<< HEAD
-            uint32_t m_roundEventN;
-            uint32_t m_completEventN;
-=======
-            void ScheduleNextEvent(Time dt);
-
-            void ReportEvent();
->>>>>>> 41d7cfb (Added cluster head assignment)
 
             Ptr<Socket> m_socket;
 
@@ -111,8 +101,11 @@ namespace ns3{
             uint32_t m_port;
             uint32_t m_packetSize;
 
-            uint32_t m_completeEvents;
             uint32_t m_roundEvents;
+            uint32_t m_roundEventN;
+
+            uint32_t m_rounds;
+            uint32_t m_roundN;
 
             Ptr<Packet> m_agroPacket;
 
