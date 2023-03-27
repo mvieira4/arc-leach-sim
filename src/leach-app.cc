@@ -20,10 +20,12 @@ namespace ns3{
 
         m_isCh = isCh;
         m_isMal = isMal;
+        
+        m_dead = false; 
 
         m_socket = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(0.2);
+        m_interval = Seconds(0.4);
 
         m_sent = 0;
         m_received = 0;
@@ -32,7 +34,7 @@ namespace ns3{
         m_roundEvents = 50;
 
         m_roundN = 0;
-        m_rounds = 50;
+        m_rounds = 100;
 
         m_executedRounds = 0;
 
@@ -46,6 +48,7 @@ namespace ns3{
 
     LeachNodeApplication::~LeachNodeApplication(){
         NS_LOG_FUNCTION(this);
+
 
         m_socket = nullptr;
         m_sendEvent = EventId();
@@ -135,7 +138,9 @@ namespace ns3{
         TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
         m_socket = Socket::CreateSocket(GetNode(), tid);
         m_socket->SetAllowBroadcast(true);
-        m_socket->BindToNetDevice(GetNode()->GetDevice(0)); m_socket->Bind(InetSocketAddress(m_localAddress, m_port)); m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
+        m_socket->BindToNetDevice(GetNode()->GetDevice(0)); 
+        m_socket->Bind(InetSocketAddress(m_localAddress, m_port)); 
+        m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
         m_socket->Listen();
 
         Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket> (m_socket);
@@ -177,9 +182,7 @@ namespace ns3{
             Ptr<Ipv4> ipv4= channel->GetDevice(i)->GetNode()->GetObject<Ipv4>();
             Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
 
-            NS_LOG_DEBUG(address);
             if(address != m_localAddress){
-
                 ScheduleTransmit(MilliSeconds(20*i), packet, address);
             }
         }
@@ -201,7 +204,6 @@ namespace ns3{
 
         m_roundN++;
     }
-
 
 
     void LeachNodeApplication::ExecuteRound(){
@@ -242,7 +244,6 @@ namespace ns3{
         NS_LOG_FUNCTION(this);
 
         Ipv4Address address = m_chAddress;
-        NS_LOG_DEBUG(address);
 
         DeviceNameTag tag;
         tag.SetDeviceName("RE");
@@ -260,19 +261,22 @@ namespace ns3{
     void LeachNodeApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << dt);
 
-        NS_LOG_DEBUG(address);
-
         m_sendEvent = Simulator::Schedule(dt, &LeachNodeApplication::Send, this, packet, address);
     }
 
 
 
     void LeachNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
-        NS_LOG_FUNCTION(address);
+        NS_LOG_FUNCTION(this << address);
 
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
-            NS_LOG_DEBUG("State: OFF");
-            m_energyTrace();
+            if(!m_dead){
+                NS_LOG_DEBUG("State: OFF");
+                NS_LOG_DEBUG("");
+                m_dead = true;
+                m_energyTrace();
+            }
+
             return;
         }
 
@@ -290,8 +294,8 @@ namespace ns3{
                             << address);
         NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
         NS_LOG_DEBUG("Sent Packets: " << m_sent);
-        NS_LOG_INFO("------------------------");
-        NS_LOG_INFO("");
+        NS_LOG_DEBUG("------------------------");
+        NS_LOG_DEBUG("");
     }
 
 
@@ -314,22 +318,22 @@ namespace ns3{
             m_rxTrace(packet);
             m_rxTraceWithAddresses(packet, from, localAddress);
 
-            NS_LOG_INFO("----PACKET RECEIVED----");
-            NS_LOG_INFO("Recv at ip " << m_localAddress << " at time " 
+            NS_LOG_DEBUG("----PACKET RECEIVED----");
+            NS_LOG_DEBUG("Recv at ip " << m_localAddress << " at time " 
                                 << Simulator::Now().As(Time::S) << " from "
                                 << InetSocketAddress::ConvertFrom(from).GetIpv4());
             NS_LOG_DEBUG("Received Packets: " << m_received);
-            NS_LOG_INFO("------------------------");
-            NS_LOG_INFO("");
+            NS_LOG_DEBUG("------------------------");
+            NS_LOG_DEBUG("");
 
 
             if(packet != nullptr){
                 packet->PeekPacketTag(tag);
-                NS_LOG_INFO("-------PACKET TAG-------");
+                NS_LOG_DEBUG("-------PACKET TAG-------");
                 NS_LOG_DEBUG("Packet Tag: " << tag.GetDeviceName());
                 NS_LOG_DEBUG("From: " << from);
-                NS_LOG_INFO("------------------------");
-                NS_LOG_INFO("");
+                NS_LOG_DEBUG("------------------------");
+                NS_LOG_DEBUG("");
 
                 std::string name = tag.GetDeviceName();
 

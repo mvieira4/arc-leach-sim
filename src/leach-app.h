@@ -89,6 +89,7 @@ namespace ns3{
 
             bool m_isCh;
             bool m_isMal;
+            bool m_dead;
              
             Ipv4Address m_localAddress;
             Ipv4Address m_chAddress;

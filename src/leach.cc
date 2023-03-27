@@ -24,38 +24,57 @@
 #include "ns3/propagation-delay-model.h"
 #include "ns3/leach-helper.h"
 
+#include <cmath>
+
+
+
+// Constants
+const bool verbose = true;
+const uint32_t nWifi = 5;
+
+
+// Globals
+uint32_t deadNode = 0; 
+uint32_t sentPacks = 0;
+uint32_t recvPacks = 0;
+
+
 using namespace ns3;
 
 void SendCb(Ptr<const Packet> packet){
+    sentPacks++;
+
     std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
-    std::cout << "Sent" << std::endl;
-    std::cout << Simulator::Now().GetSeconds() << std::endl;
+    std::cout << "Sent: " << sentPacks << std::endl;
+    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
     std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
+    std::cout << "" << std::endl;
 }
 
 void RecvCb(Ptr<const Packet> packet){
+    recvPacks++;
+
     std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
-    std::cout << "Recv" << std::endl;
-    std::cout << Simulator::Now().GetSeconds() << std::endl;
+    std::cout << "Received: " << recvPacks << std::endl;
+    std::cout << "Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100 << std::endl;
+    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
     std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
+    std::cout << "" << std::endl;
 }
 
 void EnergyCb(){
+    deadNode++;
+
     std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
     std::cout << "Energy Change" << std::endl;
-    std::cout << Simulator::Now().GetSeconds() << std::endl;
+    std::cout << "Alive Nodes: " << nWifi - deadNode << std::endl;
+    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
     std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
-}
-
-
-void RipCb(){
-
+    std::cout << "" << std::endl;
 }
 
 
 int main(int argc, char* argv[]){
-    bool verbose = true;
-    int nWifi = 2;
 
     if (verbose){
         //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
@@ -74,7 +93,7 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_DEBUG);
         //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
     }
 
@@ -108,9 +127,9 @@ int main(int argc, char* argv[]){
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(1.0),
-                                  "DeltaY", DoubleValue(1.0),
-                                  "GridWidth", UintegerValue(1),
+                                  "DeltaX", DoubleValue(0.4),
+                                  "DeltaY", DoubleValue(0.4),
+                                  "GridWidth", UintegerValue(20),
                                   "LayoutType", StringValue("RowFirst"));
 
     mobility.Install(nodes);
@@ -142,6 +161,8 @@ int main(int argc, char* argv[]){
 
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+    Config::Set("NodeList/0/ApplicationList/1/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
 
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Rx", MakeCallback(&RecvCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
