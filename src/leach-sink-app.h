@@ -2,8 +2,8 @@
  *
  *  Author: Marcel Vieira
  *
- *  Descritpion: 
- *      Header file for LeachNodeApplication class. This class implements LEACH protocol on a node.
+ *  Description:
+ *      Header file for LeachSinkApplication class. This class implements LEACH protocol on a sink.
  *
  */
 
@@ -22,29 +22,17 @@
 
 
 namespace ns3{
-    class LeachNodeApplication: public Application{
+    class LeachSinkApplication: public Application{
         public:
-            LeachNodeApplication(bool isCh = true, bool isMal = false);
+            LeachSinkApplication(bool isCh = true, bool isMal = false);
 
-            ~LeachNodeApplication() override;
+            ~LeachSinkApplication() override;
 
             static TypeId GetTypeId();
 
             void SetInterval(Time time);
 
             Time GetInterval();
-
-            void SetIsCh(bool x);
-
-            bool GetIsCh();
-
-            void SetIsMal(bool x);
-
-            bool GetIsMal();
-
-            void SetEnergyModel(Ptr<DeviceEnergyModel> model);
-
-            Ptr<WifiRadioEnergyModel> GetEnergyModel();
 
         protected:
             void DoDispose() override;
@@ -53,18 +41,6 @@ namespace ns3{
             void StartApplication() override;
 
             void StopApplication() override;
-
-            void ScheduleAdvertise(Time dt);
-
-            void Advertise();
-
-            void ScheduleNextRound(Time dt);
-
-            void ExecuteRound();
-
-            void ScheduleNextEvent(Time dt);
-
-            void ReportEvent();
 
             void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
 
@@ -78,36 +54,30 @@ namespace ns3{
             PacketLossCounter m_lossCounter;
 
             TracedCallback<Ptr<const Packet>> m_rxTrace;
+            TracedCallback<Ptr<const Packet>> m_txTrace;
+
             TracedCallback<Ptr<const Packet>, const Address&, 
                                     const Address&> m_rxTraceWithAddresses;
-
-            TracedCallback<Ptr<const Packet>> m_txTrace;
             TracedCallback<Ptr<const Packet>, const Address&, 
                                     const Address&> m_txTraceWithAddresses;
 
-            TracedCallback<> m_energyTrace;
-
-
             EventId m_sendEvent;
             EventId m_roundEvent;
-
             Time m_interval;
 
             bool m_isCh;
             bool m_isMal;
-            bool m_dead;
              
             Ipv4Address m_localAddress;
-            Ipv4Address m_chAddress;
-            Ipv4Address m_sinkAddress;
 
             std::vector<Ipv4Address> blacklist;
+
+            // ?Dictionary of potential blacklist nodes
 
             uint32_t m_sent;
             uint32_t m_received;
 
             uint32_t m_port;
-
             uint32_t m_packetSize;
 
             uint32_t m_roundEvents;
@@ -117,8 +87,6 @@ namespace ns3{
             uint32_t m_roundN;
 
             uint32_t m_executedRounds;
-
-            Ptr<Packet> m_agroPacket;
 
             Ptr<WifiRadioEnergyModel> m_energyModel;
     }; 

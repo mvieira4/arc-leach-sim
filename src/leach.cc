@@ -41,41 +41,44 @@ uint32_t recvPacks = 0;
 
 using namespace ns3;
 
+NS_LOG_COMPONENT_DEFINE("Main");
+
+
 void SendCb(Ptr<const Packet> packet){
     sentPacks++;
 
-    std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
-    std::cout << "Sent: " << sentPacks << std::endl;
-    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
-    std::cout << ">>>>>>>>>>>>>>>>>>>>" << std::endl;
-    std::cout << "" << std::endl;
+    NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
+    NS_LOG_DEBUG("Sent: " << sentPacks);
+    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+    NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
+    NS_LOG_DEBUG("");
+
 }
 
 void RecvCb(Ptr<const Packet> packet){
     recvPacks++;
 
-    std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
-    std::cout << "Received: " << recvPacks << std::endl;
-    std::cout << "Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100 << std::endl;
-    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
-    std::cout << "<<<<<<<<<<<<<<<<<<<<" << std::endl;
-    std::cout << "" << std::endl;
+    NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
+    NS_LOG_DEBUG("Received: " << recvPacks);
+    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+    NS_LOG_DEBUG("Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100);
+    NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
+    NS_LOG_DEBUG("");
 }
 
 void EnergyCb(){
     deadNode++;
 
-    std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
-    std::cout << "Energy Change" << std::endl;
-    std::cout << "Alive Nodes: " << nWifi - deadNode << std::endl;
-    std::cout << "Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10  << std::endl;
-    std::cout << "!!!!!!!!!!!!!!!!!!!!" << std::endl;
-    std::cout << "" << std::endl;
+    NS_LOG_DEBUG("!!!!!!!!!!!!!!!!!!!!");
+    NS_LOG_DEBUG("Energy Change");
+    NS_LOG_DEBUG("Alive Nodes: " << nWifi - deadNode);
+    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+    NS_LOG_DEBUG("!!!!!!!!!!!!!!!!!!!!");
+    NS_LOG_DEBUG("");
 }
 
 
 int main(int argc, char* argv[]){
-
     if (verbose){
         //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
         //LogComponentEnable("Ipv4EndPointDemux", LOG_LEVEL_ALL);
@@ -95,6 +98,7 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
         LogComponentEnable("LeachNodeApplication", LOG_LEVEL_DEBUG);
         //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
+        LogComponentEnable("Main", LOG_LEVEL_DEBUG);
     }
 
     // Create Nodes

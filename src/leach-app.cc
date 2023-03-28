@@ -280,6 +280,10 @@ namespace ns3{
             return;
         }
 
+        if(m_isMal){
+            return;
+        }
+
         m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
         m_sent++;
@@ -339,7 +343,7 @@ namespace ns3{
 
                 if(m_isCh && name == "RE"){
                     m_agroPacket->AddAtEnd(packet);
-                    NS_LOG_DEBUG("Append to pakcet");
+                    NS_LOG_DEBUG("Append to packet");
                     NS_LOG_DEBUG("");
                 }
                 else if(!m_isCh && name == "AD" && m_localAddress == m_chAddress){
