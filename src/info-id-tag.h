@@ -16,12 +16,12 @@ class InfoIdTag: protected ns3::Tag{
 
         uint32_t GetSerializedSize() const override; 
 
-        void SetInfoId(uint32_t id);
+        void SetInfoId(std::string id);
 
-        uint32_t GetInfoId();
+        std::string GetInfoId();
 
     private:
-        uint32_t m_infoId;
+        std::string m_infoId;
 };
 
 

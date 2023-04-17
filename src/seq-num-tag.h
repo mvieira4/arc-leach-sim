@@ -3,23 +3,24 @@
 #include "ns3/applications-module.h"
 
 
+namespace ns3{
+    class SeqNumTag: protected Tag{
+        public:
+            SeqNumTag();
 
-class SeqNumTag: protected ns3::Tag{
-    public:
-        SeqNumTag();
+            void Serialize(TagBuffer buffer) const override;
 
-        void Serialize(ns3::TagBuffer buffer) const override;
+            void Deserialize(TagBuffer buffer) override;
 
-        void Deserialize(ns3::TagBuffer buffer) override;
+            void Print(std::ostream &os) const override;
 
-        void Print(std::ostream &os) const override;
+            uint32_t GetSerializedSize() const override; 
 
-        uint32_t GetSerializedSize() const override; 
+            void SetSeq(uint32_t seq);
 
-        void SetSeq(uint32_t seq);
+            uint32_t GetSeqNum();
 
-        uint32_t GetSeqNum();
-
-    private:
-        uint32_t m_seqNum;
-};
+        private:
+            uint32_t m_seqNum;
+    };
+}

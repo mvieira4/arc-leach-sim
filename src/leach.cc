@@ -30,25 +30,25 @@
 
 
 
+
+using namespace ns3;
+
 // Constants
 const bool verbose = true;
-const uint32_t nWifi = 12;
+const uint32_t nWifi = 40;
 
 // Globals
 uint32_t deadNode = 0; 
 uint32_t sentPacks = 0;
 uint32_t recvPacks = 0;
+Gnuplot2dDataset packData;
+Gnuplot2dDataset aliveData;
 
-
-using namespace ns3;
-
-Gnuplot2dDataset data;
 
 NS_LOG_COMPONENT_DEFINE("Main");
 
 
 void SendCb(Ptr<const Packet> packet){
-
     DeviceNameTag tag;
     packet->PeekPacketTag(tag);
 
@@ -63,12 +63,13 @@ void SendCb(Ptr<const Packet> packet){
     }
 }
 
+
 void RecvCb(Ptr<const Packet> packet){
     DeviceNameTag tag;
     packet->PeekPacketTag(tag);
 
     if(tag.GetDeviceName() != "AD"){
-        recvPacks++;
+       recvPacks++;
 
         NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
         NS_LOG_DEBUG("Received: " << recvPacks);
@@ -77,8 +78,6 @@ void RecvCb(Ptr<const Packet> packet){
         NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
         NS_LOG_DEBUG("");
 
-        data.Add(Simulator::Now().GetSeconds(), 
-                    std::round(double(recvPacks) / double(sentPacks) * 100));
     }
 }
 
@@ -93,13 +92,33 @@ void EnergyCb(){
     NS_LOG_DEBUG("");
 }
 
+void StatusCb(){
+    aliveData.Add(Simulator::Now().GetSeconds(), nWifi - deadNode);
+
+    if(recvPacks){
+        packData.Add(Simulator::Now().GetSeconds(), 
+                        std::round(double(recvPacks) / double(sentPacks) * 100));
+    }
+    else{
+        packData.Add(Simulator::Now().GetSeconds(), 0);
+    }
+
+    NS_LOG_DEBUG("%%%%%%%%%%%%%%%%%%%%");
+    NS_LOG_DEBUG("Status Update");
+    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+    NS_LOG_DEBUG("Alive Nodes: " << nWifi - deadNode);
+    NS_LOG_DEBUG("Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100);
+    NS_LOG_DEBUG("%%%%%%%%%%%%%%%%%%%%");
+    NS_LOG_DEBUG("");
+}
+
 
 int main(int argc, char* argv[]){
     if (verbose){
         //LogComponentEnable("Ipv4EndPoint", LOG_LEVEL_ALL);
         //LogComponentEnable("Ipv4EndPointDemux", LOG_LEVEL_ALL);
         //LogComponentEnable("Packet", LOG_LEVEL_INFO);
-        //LogComponentEnable("Socket", LOG_LEVEL_ALL);
+        //LogComponentEnable("Socket", LOG_LEVEL_ALL);https://umassd.zoom.us/j/93281343753?pwd=UWd5TGsweFpyMC9ydWhzaWErZnlndz09
         //LogComponentEnable("UdpSocketImpl", LOG_LEVEL_ALL);
         //LogComponentEnable("ArpCache", ns3::LOG_LEVEL_ALL);
         //LogComponentEnable("ArpL3Protocol", LOG_LEVEL_ALL);
@@ -122,8 +141,10 @@ int main(int argc, char* argv[]){
     NodeContainer nodes;
     nodes.Create(nWifi + 1);
 
+
     NodeContainer sink;
     sink = nodes.Get(0);
+
 
     NodeContainer sensors;
 
@@ -132,7 +153,7 @@ int main(int argc, char* argv[]){
     }
 
 
-    // Create & Configure Wifi Devices
+    // Create & Configure Wifi Deviceshttps://umassd.zoom.us/j/93281343753?pwd=UWd5TGsweFpyMC9ydWhzaWErZnlndz09
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
     channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
@@ -141,17 +162,13 @@ int main(int argc, char* argv[]){
     YansWifiPhyHelper phy;
     phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
     phy.SetChannel(channel.Create());
-    //phy.Set("RxGain", DoubleValue(40));    
     phy.Set("TxPowerStart", DoubleValue(100));    
     phy.Set("TxPowerEnd", DoubleValue(100));    
     phy.Set("Antennas", UintegerValue(4));    
-    //phy.Set("CcaEdThreshold", DoubleValue(-100));
 
     WifiMacHelper mac;
     mac.SetType("ns3::AdhocWifiMac");
     
-
-
     WifiHelper wifi;
     wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
     wifi.SetStandard(WIFI_STANDARD_80211g);
@@ -187,6 +204,8 @@ int main(int argc, char* argv[]){
 
     // Install Batteries on Nodes
     BasicEnergySourceHelper battery;
+    battery.Set("BasicEnergySourceInitialEnergyJ", DoubleValue(36000));
+
     EnergySourceContainer sensorBatteries = battery.Install(sensors);
 
     // Install Energy Model on Nodes
@@ -212,44 +231,73 @@ int main(int argc, char* argv[]){
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    Config::Set("NodeList/0/ApplicationList/1/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
+    //Config::Set("NodeList/0/ApplicationList/1/$ns3::LeachNodeApplication/IsMal", BooleanValue(false));
 
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachSinkApplication/Rx", MakeCallback(&RecvCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/RemainingEnergy",
             MakeCallback(&EnergyCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Status",
+            MakeCallback(&StatusCb));
 
     //Config::SetDefault("ns3::ArpCache::PendingQueueSize", UintegerValue(20));
+    Config::SetDefault("ns3::LeachNodeApplication::IsMal", BooleanValue(true));
+    Config::SetDefault("ns3::LeachNodeApplication::IsCh", BooleanValue(true));
 
     // Run Sim
     Simulator::Stop(Seconds(20));
     Simulator::Run();
     Simulator::Destroy();
 
-    std::string fileNameWithNoExtension = "leach-plot";
+    std::string fileNameWithNoExtension = "pack-plot";
     std::string graphicsFileName        = fileNameWithNoExtension + ".png";
     std::string plotFileName            = fileNameWithNoExtension + ".plt";
     std::string plotTitle               = "2-D Plot";
     std::string dataTitle               = "2-D Data";
 
-    Gnuplot2dDataset dataset;
-    data.SetTitle(dataTitle);
-    data.SetStyle(Gnuplot2dDataset::LINES_POINTS);
+    packData.SetTitle(dataTitle);
+    packData.SetStyle(Gnuplot2dDataset::LINES_POINTS);
 
-    Gnuplot plot(graphicsFileName);
-    plot.SetTitle(plotTitle);
+    Gnuplot plot1(graphicsFileName);
+    plot1.SetTitle(plotTitle);
 
-    plot.SetTerminal("png");
-    plot.SetLegend("Time", "Percentage");
-    plot.AppendExtra("set xrange [1:15]");
+    plot1.SetTerminal("png");
+    plot1.SetLegend("Time", "Percentage");
+    plot1.AppendExtra("set xrange [1:15]");
 
-    plot.AddDataset(data);
+    plot1.AddDataset(packData);
 
-    std::ofstream plotFile(plotFileName.c_str());
+    std::ofstream plotFile1(plotFileName.c_str());
 
-    plot.GenerateOutput(plotFile);
+    plot1.GenerateOutput(plotFile1);
 
-    plotFile.close();
+    plotFile1.close();
+
+
+
+    fileNameWithNoExtension = "alive-plot";
+    graphicsFileName        = fileNameWithNoExtension + ".png";
+    plotFileName            = fileNameWithNoExtension + ".plt";
+    plotTitle               = "2-D Plot";
+    dataTitle               = "2-D Data";
+
+    packData.SetTitle(dataTitle);
+    packData.SetStyle(Gnuplot2dDataset::LINES_POINTS);
+
+    Gnuplot plot2(graphicsFileName);
+    plot2.SetTitle(plotTitle);
+
+    plot2.SetTerminal("png");
+    plot2.SetLegend("Time", "Percentage");
+    plot2.AppendExtra("set xrange [1:15]");
+
+    plot2.AddDataset(aliveData);
+
+    std::ofstream plotFile2(plotFileName.c_str());
+
+    plot2.GenerateOutput(plotFile2);
+
+    plotFile2.close();
 
     return 0;
 }

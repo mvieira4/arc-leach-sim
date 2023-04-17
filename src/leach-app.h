@@ -24,7 +24,7 @@
 namespace ns3{
     class LeachNodeApplication: public Application{
         public:
-            LeachNodeApplication(bool isCh = true, bool isMal = false);
+            LeachNodeApplication();
 
             ~LeachNodeApplication() override;
 
@@ -86,6 +86,7 @@ namespace ns3{
                                     const Address&> m_txTraceWithAddresses;
 
             TracedCallback<> m_energyTrace;
+            TracedCallback<> m_statusTrace;
 
 
             EventId m_sendEvent;

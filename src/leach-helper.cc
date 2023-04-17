@@ -15,10 +15,6 @@ namespace ns3{
         m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
     }
 
-    LeachNodeHelper::LeachNodeHelper(uint32_t nodeNum, double malProb){
-        m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
-        m_factory.Set("IsCh", BooleanValue(true));
-    }
 
     ApplicationContainer LeachNodeHelper::Install(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
         return ApplicationContainer(InstallPriv(node, energyModel));
@@ -50,6 +46,7 @@ namespace ns3{
 
         app = m_factory.Create<LeachNodeApplication>();
         app->SetEnergyModel(energyModel);
+        //app->SetIsCh((((double)rand() / RAND_MAX) < 0.9));
 
         node->AddApplication(app);
 

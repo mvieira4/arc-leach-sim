@@ -20,11 +20,11 @@ uint32_t InfoIdTag::GetSerializedSize() const{
     return sizeof(m_infoId);
 }
 
-void InfoIdTag::SetInfoId(uint32_t id){
+void InfoIdTag::SetInfoId(std::string id){
     m_infoId = id;
 }
 
-uint32_t InfoIdTag::GetInfoId(){
+std::string InfoIdTag::GetInfoId(){
     return m_infoId;
 }
 
