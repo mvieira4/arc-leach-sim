@@ -8,17 +8,21 @@ namespace ns3{
         public:
             SeqNumTag();
 
+            void SetSeq(uint32_t seq);
+
+            uint32_t GetSeqNum();
+
+            TypeId GetTypeId() const;
+
+            TypeId GetInstanceTypeId() const override;
+
+            uint32_t GetSerializedSize() const override; 
+
             void Serialize(TagBuffer buffer) const override;
 
             void Deserialize(TagBuffer buffer) override;
 
             void Print(std::ostream &os) const override;
-
-            uint32_t GetSerializedSize() const override; 
-
-            void SetSeq(uint32_t seq);
-
-            uint32_t GetSeqNum();
 
         private:
             uint32_t m_seqNum;

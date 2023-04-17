@@ -227,8 +227,6 @@ namespace ns3{
         typeTag.SetDeviceName("AD");
 
 
-        Ptr<PacketMetadata> metadata = CreateObject<PacketMetadata>();
-
         // Create & config packet
         Ptr<Packet> packet;
         packet = Create<Packet>(m_packetSize);
