@@ -23,6 +23,8 @@
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
 #include "ns3/leach-helper.h"
+#include "ns3/leach-sink-helper.h"
+#include "ns3/gnuplot-helper.h"
 
 #include <cmath>
 
@@ -30,8 +32,7 @@
 
 // Constants
 const bool verbose = true;
-const uint32_t nWifi = 5;
-
+const uint32_t nWifi = 12;
 
 // Globals
 uint32_t deadNode = 0; 
@@ -41,29 +42,44 @@ uint32_t recvPacks = 0;
 
 using namespace ns3;
 
+Gnuplot2dDataset data;
+
 NS_LOG_COMPONENT_DEFINE("Main");
 
 
 void SendCb(Ptr<const Packet> packet){
-    sentPacks++;
 
-    NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
-    NS_LOG_DEBUG("Sent: " << sentPacks);
-    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
-    NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
-    NS_LOG_DEBUG("");
+    DeviceNameTag tag;
+    packet->PeekPacketTag(tag);
 
+    if(tag.GetDeviceName() != "AD"){
+        sentPacks++;
+
+        NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
+        NS_LOG_DEBUG("Sent: " << sentPacks);
+        NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+        NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
+        NS_LOG_DEBUG("");
+    }
 }
 
 void RecvCb(Ptr<const Packet> packet){
-    recvPacks++;
+    DeviceNameTag tag;
+    packet->PeekPacketTag(tag);
 
-    NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
-    NS_LOG_DEBUG("Received: " << recvPacks);
-    NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
-    NS_LOG_DEBUG("Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100);
-    NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
-    NS_LOG_DEBUG("");
+    if(tag.GetDeviceName() != "AD"){
+        recvPacks++;
+
+        NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
+        NS_LOG_DEBUG("Received: " << recvPacks);
+        NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
+        NS_LOG_DEBUG("Receive Percentage: " << std::round(double(recvPacks) / double(sentPacks) * 100) / 100);
+        NS_LOG_DEBUG("<<<<<<<<<<<<<<<<<<<<");
+        NS_LOG_DEBUG("");
+
+        data.Add(Simulator::Now().GetSeconds(), 
+                    std::round(double(recvPacks) / double(sentPacks) * 100));
+    }
 }
 
 void EnergyCb(){
@@ -96,32 +112,52 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_DEBUG);
+        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("LeachSinkApplication", LOG_LEVEL_ALL);
         //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
         LogComponentEnable("Main", LOG_LEVEL_DEBUG);
     }
 
     // Create Nodes
     NodeContainer nodes;
-    nodes.Create(nWifi);
+    nodes.Create(nWifi + 1);
+
+    NodeContainer sink;
+    sink = nodes.Get(0);
+
+    NodeContainer sensors;
+
+    for (NodeContainer::Iterator i = nodes.Begin() + 1; i != nodes.End(); ++i) {
+        sensors.Add(*i);
+    }
+
 
     // Create & Configure Wifi Devices
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
     channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
 
+
     YansWifiPhyHelper phy;
     phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
     phy.SetChannel(channel.Create());
+    //phy.Set("RxGain", DoubleValue(40));    
+    phy.Set("TxPowerStart", DoubleValue(100));    
+    phy.Set("TxPowerEnd", DoubleValue(100));    
+    phy.Set("Antennas", UintegerValue(4));    
+    //phy.Set("CcaEdThreshold", DoubleValue(-100));
 
     WifiMacHelper mac;
     mac.SetType("ns3::AdhocWifiMac");
+    
+
 
     WifiHelper wifi;
     wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
-    wifi.SetStandard(WIFI_STANDARD_80211b); // 2.4GHz
+    wifi.SetStandard(WIFI_STANDARD_80211g);
 
-    NetDeviceContainer devices = wifi.Install(phy, mac, nodes);
+    NetDeviceContainer sinkDevices = wifi.Install(phy, mac, sink);
+    NetDeviceContainer sensorDevices = wifi.Install(phy, mac, sensors);
 
     // Configure Mobility Model
     MobilityHelper mobility;
@@ -131,8 +167,8 @@ int main(int argc, char* argv[]){
     mobility.SetPositionAllocator("ns3::GridPositionAllocator",
                                   "MinX", DoubleValue(0.0),
                                   "MinY", DoubleValue(0.0),
-                                  "DeltaX", DoubleValue(0.4),
-                                  "DeltaY", DoubleValue(0.4),
+                                  "DeltaX", DoubleValue(1.0),
+                                  "DeltaY", DoubleValue(1.0),
                                   "GridWidth", UintegerValue(20),
                                   "LayoutType", StringValue("RowFirst"));
 
@@ -140,43 +176,80 @@ int main(int argc, char* argv[]){
 
     // Config Ineternet Stack
     InternetStackHelper internet;
-    internet.Install(nodes);
+    internet.Install(sink);
+    internet.Install(sensors);
 
     Ipv4AddressHelper address;
 
     address.SetBase("10.0.0.0", "255.255.255.0");
-    Ipv4InterfaceContainer interfaces = address.Assign(devices);
+    Ipv4InterfaceContainer nodeInterfaces = address.Assign(sinkDevices);
+    Ipv4InterfaceContainer sensorInterfaces = address.Assign(sensorDevices);
 
     // Install Batteries on Nodes
     BasicEnergySourceHelper battery;
-    EnergySourceContainer batteries = battery.Install(nodes);
+    EnergySourceContainer sensorBatteries = battery.Install(sensors);
 
     // Install Energy Model on Nodes
     WifiRadioEnergyModelHelper energyModel;
-    DeviceEnergyModelContainer energyModels = energyModel.Install(devices, batteries);
+    DeviceEnergyModelContainer energyModels = energyModel.Install(sensorDevices, sensorBatteries);
 
+
+    LeachSinkHelper sinkLeach(nWifi);
+
+    ApplicationContainer sinkApp = sinkLeach.Install(sink);
+
+    sinkApp.Start(Seconds(0.5));
+    sinkApp.Stop(Seconds(20.0));
 
     LeachNodeHelper nodeLeach(nWifi);
 
-    ApplicationContainer nodeApps = nodeLeach.Install(nodes, energyModels);
+    ApplicationContainer nodeApps = nodeLeach.Install(sensors, energyModels);
 
-    nodeApps.Start(Seconds(1));
-    nodeApps.Stop(Seconds(20));
+    nodeApps.Start(Seconds(1.0));
+    nodeApps.Stop(Seconds(20.0));
+
 
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
     Config::Set("NodeList/0/ApplicationList/1/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
 
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Rx", MakeCallback(&RecvCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachSinkApplication/Rx", MakeCallback(&RecvCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
     Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/RemainingEnergy",
             MakeCallback(&EnergyCb));
+
+    //Config::SetDefault("ns3::ArpCache::PendingQueueSize", UintegerValue(20));
 
     // Run Sim
     Simulator::Stop(Seconds(20));
     Simulator::Run();
     Simulator::Destroy();
+
+    std::string fileNameWithNoExtension = "leach-plot";
+    std::string graphicsFileName        = fileNameWithNoExtension + ".png";
+    std::string plotFileName            = fileNameWithNoExtension + ".plt";
+    std::string plotTitle               = "2-D Plot";
+    std::string dataTitle               = "2-D Data";
+
+    Gnuplot2dDataset dataset;
+    data.SetTitle(dataTitle);
+    data.SetStyle(Gnuplot2dDataset::LINES_POINTS);
+
+    Gnuplot plot(graphicsFileName);
+    plot.SetTitle(plotTitle);
+
+    plot.SetTerminal("png");
+    plot.SetLegend("Time", "Percentage");
+    plot.AppendExtra("set xrange [1:15]");
+
+    plot.AddDataset(data);
+
+    std::ofstream plotFile(plotFileName.c_str());
+
+    plot.GenerateOutput(plotFile);
+
+    plotFile.close();
 
     return 0;
 }

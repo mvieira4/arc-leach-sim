@@ -24,7 +24,7 @@
 namespace ns3{
     class LeachSinkApplication: public Application{
         public:
-            LeachSinkApplication(bool isCh = true, bool isMal = false);
+            LeachSinkApplication();
 
             ~LeachSinkApplication() override;
 
@@ -63,11 +63,7 @@ namespace ns3{
 
             EventId m_sendEvent;
             EventId m_roundEvent;
-            Time m_interval;
 
-            bool m_isCh;
-            bool m_isMal;
-             
             Ipv4Address m_localAddress;
 
             std::vector<Ipv4Address> blacklist;
@@ -87,8 +83,6 @@ namespace ns3{
             uint32_t m_roundN;
 
             uint32_t m_executedRounds;
-
-            Ptr<WifiRadioEnergyModel> m_energyModel;
     }; 
 }
 

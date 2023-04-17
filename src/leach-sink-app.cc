@@ -19,6 +19,7 @@
 #include "ns3/packet-socket-factory.h"
 #include "ns3/yans-wifi-helper.h"
 #include "ns3/basic-energy-source.h"
+#include "ns3/wifi-net-device.h"
 
 #include "leach-sink-app.h"
 
@@ -26,26 +27,14 @@
 namespace ns3{
     NS_LOG_COMPONENT_DEFINE("LeachSinkApplication");
     
-    LeachSinkApplication::LeachSinkApplication(bool isCh, bool isMal): m_lossCounter(0){
+    LeachSinkApplication::LeachSinkApplication(): m_lossCounter(0){
         NS_LOG_FUNCTION(this);
 
-        m_isCh = isCh;
-        m_isMal = isMal;
-        
         m_socket = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(0.4);
 
         m_sent = 0;
         m_received = 0;
-
-        m_roundEventN = 0;
-        m_roundEvents = 50;
-
-        m_roundN = 0;
-        m_rounds = 100;
-
-        m_executedRounds = 0;
 
         m_packetSize = 1024;
 
@@ -68,10 +57,6 @@ namespace ns3{
             .SetParent<Application>()
             .SetGroupName("Applications")
             .AddConstructor<LeachSinkApplication>()
-            .AddAttribute("IsCh", "If node is cluster head", BooleanValue(true), 
-                            MakeDoubleAccessor(&LeachSinkApplication::m_isCh), MakeBooleanChecker())
-            .AddAttribute("IsMal", "If node is malicious", BooleanValue(false), 
-                            MakeDoubleAccessor(&LeachSinkApplication::m_isMal), MakeBooleanChecker())
             .AddAttribute("RoundEvents", "Number of evnets in a round", IntegerValue(5), 
                             MakeDoubleAccessor(&LeachSinkApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
             .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&LeachSinkApplication::m_rxTrace),
@@ -83,14 +68,6 @@ namespace ns3{
                             "Packet::TracedCallback");
 
         return tid;
-    }
-
-    void LeachSinkApplication::SetInterval(Time time){
-        m_interval = time;
-    }
-
-    Time LeachSinkApplication::GetInterval(){
-        return m_interval;
     }
 
     // Methods
@@ -117,7 +94,6 @@ namespace ns3{
 
         Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket> (m_socket);
         udpSocket->MulticastJoinGroup (0, InetSocketAddress(m_localAddress, m_port));
-
     }
 
 
@@ -144,16 +120,14 @@ namespace ns3{
     void LeachSinkApplication::Send(Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << address);
 
-        if(m_isMal){
-            return;
-        }
+        NS_LOG_DEBUG("----------STATE---------");
+        NS_LOG_DEBUG("State: " << m_node->GetObject<WifiPhy>()->GetState());
+        NS_LOG_DEBUG("------------------------");
+        NS_LOG_DEBUG("");
 
         m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
         m_sent++;
-
-        m_txTrace(packet);
-        m_rxTraceWithAddresses(packet, m_localAddress, address);
 
         NS_LOG_DEBUG("-------PACKET SENT------");
         NS_LOG_DEBUG("Round: " << m_executedRounds);
@@ -164,6 +138,9 @@ namespace ns3{
         NS_LOG_DEBUG("Sent Packets: " << m_sent);
         NS_LOG_DEBUG("------------------------");
         NS_LOG_DEBUG("");
+
+        m_txTrace(packet);
+        m_rxTraceWithAddresses(packet, m_localAddress, address);
     }
 
 
@@ -178,16 +155,19 @@ namespace ns3{
 
         while ((packet = socket->RecvFrom(from))){
 
+            Ptr<WifiNetDevice> wifiNetDevice = DynamicCast<WifiNetDevice>(m_node->GetDevice(0));
+
+            NS_LOG_DEBUG("----------STATE---------");
+            NS_LOG_DEBUG("State: " << wifiNetDevice->GetPhy()->GetState()->GetState());
+            NS_LOG_DEBUG("------------------------");
+            NS_LOG_DEBUG("");
+
             socket->GetSockName(localAddress);
 
             m_received++;
 
-
-            m_rxTrace(packet);
-            m_rxTraceWithAddresses(packet, from, localAddress);
-
             NS_LOG_DEBUG("----PACKET RECEIVED----");
-            NS_LOG_DEBUG("Recv at ip " << m_localAddress << " at time " 
+            NS_LOG_DEBUG("Recv at sink ip " << m_localAddress << " at time " 
                                 << Simulator::Now().As(Time::S) << " from "
                                 << InetSocketAddress::ConvertFrom(from).GetIpv4());
             NS_LOG_DEBUG("Received Packets: " << m_received);
@@ -204,12 +184,10 @@ namespace ns3{
                 NS_LOG_DEBUG("");
 
                 std::string name = tag.GetDeviceName();
-
-                if(m_isCh && name == "RE"){
-                    NS_LOG_DEBUG("Append to packet");
-                    NS_LOG_DEBUG("");
-                }
             }
+
+            m_rxTrace(packet);
+            m_rxTraceWithAddresses(packet, from, localAddress);
         }
     }
 

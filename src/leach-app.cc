@@ -25,18 +25,16 @@ namespace ns3{
 
         m_socket = nullptr;
         m_sendEvent = EventId();
-        m_interval = Seconds(0.4);
+        m_interval = MilliSeconds(450);
 
         m_sent = 0;
         m_received = 0;
 
         m_roundEventN = 0;
-        m_roundEvents = 50;
+        m_roundEvents = 5;
 
         m_roundN = 0;
-        m_rounds = 100;
-
-        m_executedRounds = 0;
+        m_rounds = 10;
 
         m_packetSize = 1024;
 
@@ -95,7 +93,6 @@ namespace ns3{
         m_isCh = x;
     }
 
-
     bool LeachNodeApplication::GetIsCh(){
         return m_isCh;
     }
@@ -131,7 +128,8 @@ namespace ns3{
 
         Ptr<Ipv4> ipv4 = m_node->GetObject<Ipv4>();
         m_localAddress = ipv4->GetAddress (1, 0).GetLocal();
-        m_chAddress = m_localAddress;
+        m_sinkAddress = Ipv4Address("10.0.0.1");
+        m_chAddress = m_sinkAddress;
 
         m_agroPacket = Create<Packet>();
 
@@ -146,7 +144,9 @@ namespace ns3{
         Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket> (m_socket);
         udpSocket->MulticastJoinGroup (0, InetSocketAddress(m_localAddress, m_port));
 
-        ScheduleNextRound(Seconds(0));
+
+        NS_LOG_DEBUG("Start: " << GetNode()->GetId() * 50);
+        ScheduleNextRound(MilliSeconds(GetNode()->GetId() * 20));
     }
 
 
@@ -174,7 +174,7 @@ namespace ns3{
 
         Ptr<Packet> packet;
         packet = Create<Packet>(m_packetSize);
-        //packet->AddPacketTag(tag);
+        packet->AddPacketTag(tag);
 
         Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
 
@@ -183,7 +183,7 @@ namespace ns3{
             Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
 
             if(address != m_localAddress){
-                ScheduleTransmit(MilliSeconds(20*i), packet, address);
+                ScheduleTransmit(MilliSeconds(40*i), packet, address);
             }
         }
     }
@@ -199,28 +199,24 @@ namespace ns3{
 
         if(m_roundN < m_rounds){
             m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
-
+            m_roundEventN = 0;
         }
-
-        m_roundN++;
     }
 
 
     void LeachNodeApplication::ExecuteRound(){
         NS_LOG_FUNCTION(this);
 
-        m_executedRounds++;
-    
         if(m_isCh){
             ScheduleAdvertise(Seconds(0));
         }
 
+        ScheduleNextEvent(m_interval);
 
-        ScheduleNextEvent(Seconds(0));
+        m_roundN++;
 
-        ScheduleNextRound(m_interval);
 
-        m_chAddress = m_localAddress;
+        m_chAddress = m_sinkAddress;
     }
 
 
@@ -236,8 +232,9 @@ namespace ns3{
         if(m_roundEventN < m_roundEvents){
             m_roundEvent = Simulator::Schedule(dt, &LeachNodeApplication::ReportEvent, this);
         }
-
-        m_roundEventN++;
+        else{
+            ScheduleNextRound(Seconds(0.5));
+        }
     }
 
     void LeachNodeApplication::ReportEvent(){
@@ -252,10 +249,11 @@ namespace ns3{
         packet = Create<Packet>(m_packetSize);
         packet->AddPacketTag(tag);
 
-        ScheduleTransmit(m_interval, packet, address);
+        ScheduleTransmit(Seconds(0), packet, address);
 
         ScheduleNextEvent(m_interval);
 
+        m_roundEventN++;
     }
 
     void LeachNodeApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
@@ -268,6 +266,11 @@ namespace ns3{
 
     void LeachNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << address);
+
+        NS_LOG_DEBUG("----------STATE---------");
+        NS_LOG_DEBUG("State: " << m_energyModel->GetCurrentState());
+        NS_LOG_DEBUG("------------------------");
+        NS_LOG_DEBUG("");
 
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
             if(!m_dead){
@@ -286,20 +289,25 @@ namespace ns3{
 
         m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
-        m_sent++;
-
-        m_txTrace(packet);
-        m_rxTraceWithAddresses(packet, m_localAddress, address);
+        DeviceNameTag tag;
+        packet->PeekPacketTag(tag);
 
         NS_LOG_DEBUG("-------PACKET SENT------");
-        NS_LOG_DEBUG("Round: " << m_executedRounds);
+        NS_LOG_DEBUG("Id: " << GetNode()->GetId());
+        NS_LOG_DEBUG("Round: " << m_roundN);
         NS_LOG_DEBUG("From ip " << m_localAddress << " at time " 
                             << Simulator::Now().As(Time::S) << " to "
                             << address);
         NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
+        NS_LOG_DEBUG("Packet Tag: " << tag.GetDeviceName());
         NS_LOG_DEBUG("Sent Packets: " << m_sent);
         NS_LOG_DEBUG("------------------------");
         NS_LOG_DEBUG("");
+
+        m_txTrace(packet);
+        m_rxTraceWithAddresses(packet, m_localAddress, address);
+
+        m_sent++;
     }
 
 
@@ -313,17 +321,15 @@ namespace ns3{
         DeviceNameTag tag;
 
         while ((packet = socket->RecvFrom(from))){
+            NS_LOG_DEBUG("----------STATE---------");
+            NS_LOG_DEBUG("State: " << m_energyModel->GetCurrentState());
+            NS_LOG_DEBUG("------------------------");
+            NS_LOG_DEBUG("");
 
             socket->GetSockName(localAddress);
 
-            m_received++;
-
-
-            m_rxTrace(packet);
-            m_rxTraceWithAddresses(packet, from, localAddress);
-
             NS_LOG_DEBUG("----PACKET RECEIVED----");
-            NS_LOG_DEBUG("Recv at ip " << m_localAddress << " at time " 
+            NS_LOG_DEBUG("Recv at node ip " << m_localAddress << " at time " 
                                 << Simulator::Now().As(Time::S) << " from "
                                 << InetSocketAddress::ConvertFrom(from).GetIpv4());
             NS_LOG_DEBUG("Received Packets: " << m_received);
@@ -346,13 +352,17 @@ namespace ns3{
                     NS_LOG_DEBUG("Append to packet");
                     NS_LOG_DEBUG("");
                 }
-                else if(!m_isCh && name == "AD" && m_localAddress == m_chAddress){
+                else if(!m_isCh && name == "AD" && m_localAddress != m_chAddress){
                     m_chAddress = InetSocketAddress::ConvertFrom(from).GetIpv4();
                     NS_LOG_DEBUG("Set cluster head");
                     NS_LOG_DEBUG("");
                 }
             }
 
+            m_rxTrace(packet);
+            m_rxTraceWithAddresses(packet, from, localAddress);
+
+            m_received++;
         }
     }
 
