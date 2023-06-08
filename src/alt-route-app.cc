@@ -12,20 +12,17 @@
 #include "ns3/yans-wifi-helper.h"
 #include "ns3/basic-energy-source.h"
 
-#include "ns3/leach-app.h"
-#include "ns3/info-id-tag.h"
-#include "ns3/timestamp-tag.h"
-#include "ns3/seq-num-tag.h"
+#include "ns3/alt-route-app.h"
 #include "ns3/leach-tag-list.h"
 
 #include <cmath>
 #include <random>
 
 namespace ns3{
-    NS_LOG_COMPONENT_DEFINE("LeachNodeApplication");
+    NS_LOG_COMPONENT_DEFINE("AltRouteNodeApplication");
     
     // Constructor
-    LeachNodeApplication::LeachNodeApplication(): m_lossCounter(0){
+    AltRouteNodeApplication::AltRouteNodeApplication(): m_lossCounter(0){
         NS_LOG_FUNCTION(this << Simulator::Now());
 
         // Time between events
@@ -33,17 +30,20 @@ namespace ns3{
 
         // Event values per round
         m_roundEventN = 0;
-        m_roundEvents = 100; 
+        m_roundEvents = 50; 
 
         // Round values
         m_roundN = 0;
-        m_rounds = 200;
+        m_rounds = 100;
+
+        // Alt routing values
+        m_routes = 8;
 
         // Port number 
         m_port = 50;
         
         // Default packet size
-        m_packetSize = 1024;
+        m_packetSize = 1029; // 1024 + 4 Byte Ip + 1 Pack Type
 
         // Max aggrogated packet size
         m_maxPacketSize = 0;
@@ -53,11 +53,14 @@ namespace ns3{
 
         // Set sequence number to 0;
         m_seqNum = 1;
+
+        m_blacklist = {};
+        m_nodes = {};
     }
 
 
     // Deconstructor
-    LeachNodeApplication::~LeachNodeApplication(){
+    AltRouteNodeApplication::~AltRouteNodeApplication(){
         NS_LOG_FUNCTION(this << Simulator::Now());
 
         // Clear aggrogated packet
@@ -72,7 +75,7 @@ namespace ns3{
 
 
     // Destroys application 
-    void LeachNodeApplication::DoDispose(){
+    void AltRouteNodeApplication::DoDispose(){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << Simulator::Now().As(Time::S));
 
         Application::DoDispose();
@@ -80,7 +83,7 @@ namespace ns3{
 
 
     // Initilize application
-    void LeachNodeApplication::StartApplication(){
+    void AltRouteNodeApplication::StartApplication(){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << Simulator::Now().As(Time::S));
 
         // Create a random number generator
@@ -94,7 +97,7 @@ namespace ns3{
         m_dead = false; 
 
         double random_double = dis(gen);
-        //m_isMal = random_double < 0.25 * 0.33;
+        //m_isMal = random_double < 1.0/12;
         //m_isMal = false;
 
         random_double = dis(gen);
@@ -112,7 +115,7 @@ namespace ns3{
         m_socket->SetAllowBroadcast(true);
         m_socket->BindToNetDevice(GetNode()->GetDevice(0)); 
         m_socket->Bind(InetSocketAddress(m_localAddress, m_port)); 
-        m_socket->SetRecvCallback(MakeCallback(&LeachNodeApplication::HandleRead, this));
+        m_socket->SetRecvCallback(MakeCallback(&AltRouteNodeApplication::HandleRead, this));
         m_socket->Listen();
 
         // Start application based on node id
@@ -128,7 +131,7 @@ namespace ns3{
 
 
     // Terminate application
-    void LeachNodeApplication::StopApplication(){
+    void AltRouteNodeApplication::StopApplication(){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << Simulator::Now().As(Time::S));
      
         // Disable receive callback 
@@ -136,20 +139,22 @@ namespace ns3{
     }
 
 
-    void LeachNodeApplication::ReportStatus(){
+    void AltRouteNodeApplication::ReportStatus(){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << Simulator::Now().As(Time::S));
 
         m_statusTrace(m_roundN);
 
         if(!m_dead && m_roundN < m_rounds){
             NS_LOG_DEBUG("Round: " << m_roundN);
-            Simulator::Schedule(Seconds(20), &LeachNodeApplication::ReportStatus, this);
+            NS_LOG_DEBUG("Energy: " << m_energyModel->GetTotalEnergyConsumption());
+
+            Simulator::Schedule(Seconds(3), &AltRouteNodeApplication::ReportStatus, this);
         }
     }
 
 
     // Schedule round
-    void LeachNodeApplication::ScheduleNextRound(Time dt){
+    void AltRouteNodeApplication::ScheduleNextRound(Time dt){
         NS_LOG_FUNCTION(this << GetNode()->GetId());
 
         // Exit if node dead
@@ -159,14 +164,18 @@ namespace ns3{
 
         // Schedule next round unless target number reached
         if(m_roundN < m_rounds){
-            Simulator::Schedule(dt, &LeachNodeApplication::ExecuteRound, this);
+            Simulator::Schedule(dt, &AltRouteNodeApplication::ExecuteRound, this);
         }
     }
 
 
     // Run the round
-    void LeachNodeApplication::ExecuteRound(){
+    void AltRouteNodeApplication::ExecuteRound(){
         NS_LOG_FUNCTION(this << GetNode()->GetId());
+
+        m_roundN++;
+
+        //ReportStatus();
 
         // Create a random number generator
         std::random_device rd;
@@ -191,14 +200,16 @@ namespace ns3{
         m_chPrevAddress = m_chAddress;
         m_chAddress = m_sinkAddress;
 
+        m_nodes.clear();
+
         // Reset aggrogated packet
-        m_agroPacket = Create<Packet>(0);
+        m_agroPacket = Create<Packet>(m_packetSize);
 
         ScheduleAdvertise(Seconds(0));
     }
 
 
-    void LeachNodeApplication::ScheduleAdvertise(Time dt){
+    void AltRouteNodeApplication::ScheduleAdvertise(Time dt){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << m_advertisments);
 
         // Get wifi channel
@@ -206,7 +217,7 @@ namespace ns3{
 
 
         if(m_advertisments < channel->GetNDevices()){
-            Simulator::Schedule(dt, &LeachNodeApplication::Advertise, this);
+            Simulator::Schedule(dt, &AltRouteNodeApplication::Advertise, this);
         }
         else{
             ScheduleNextEvent(dt);
@@ -214,36 +225,43 @@ namespace ns3{
     }
 
 
-    void LeachNodeApplication::Advertise(){
+    void AltRouteNodeApplication::Advertise(){
         NS_LOG_FUNCTION(this << GetNode()->GetId());
         
+        LeachTag tag;
+        tag.SetTimestamp(Simulator::Now());
+        tag.SetNodeAddress(m_localAddress);
+        tag.SetCHAddress(m_chAddress);
+        tag.SetCHPrevAddress(m_chPrevAddress);
+
         if(m_isCh){
-            LeachTag tag;
             tag.SetPackType(LeachTag::AD);
-            tag.SetTimestamp(Simulator::Now());
-            tag.SetNodeAddress(m_localAddress);
-            tag.SetCHAddress(m_chAddress);
-            tag.SetCHPrevAddress(m_chPrevAddress);
+        }
+        else{
+            tag.SetPackType(LeachTag::ADN);
+        }
 
-            // Create & config packet
-            Ptr<Packet> packet;
-            packet = Create<Packet>(m_packetSize);
-            packet->AddPacketTag(tag);
+        // Create & config packet
+        Ptr<Packet> packet;
+        packet = Create<Packet>(m_packetSize);
+        packet->AddPacketTag(tag);
 
-            // Get wifi channel
-            Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
+        // Get wifi channel
+        Ptr<Channel> channel = GetNode()->GetDevice(0)->GetChannel();
 
-            // Send message to all nodes on channel 
-            Ptr<Ipv4> ipv4= channel->GetDevice(m_advertisments)->GetNode()->GetObject<Ipv4>();
-            Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
+        // Send message to all nodes on channel 
+        Ptr<Ipv4> ipv4= channel->GetDevice(m_advertisments)->GetNode()->GetObject<Ipv4>();
+        Ipv4Address address = ipv4->GetAddress (1, 0).GetLocal();
 
-            if(address != m_localAddress){
-                if(CheckDead()){
-                    return;
-                }
 
-                m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
+        if(address != m_localAddress){
+            if(CheckDead()){
+                return;
+            }
 
+            m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
+
+            if(m_isCh){
                 NS_LOG_DEBUG("---------CH SENT--------");
                 NS_LOG_DEBUG("Id: " << GetNode()->GetId());
                 NS_LOG_DEBUG("Ip: " << m_localAddress);
@@ -258,6 +276,22 @@ namespace ns3{
                 NS_LOG_DEBUG("------------------------");
                 NS_LOG_DEBUG("");
             }
+            else{
+                NS_LOG_DEBUG("--------NODE SENT-------");
+                NS_LOG_DEBUG("Id: " << GetNode()->GetId());
+                NS_LOG_DEBUG("Ip: " << m_localAddress);
+                NS_LOG_DEBUG("To: " << address);
+                NS_LOG_DEBUG("Ch: " << m_isCh);
+                NS_LOG_DEBUG("Mal: " << m_isMal);
+                NS_LOG_DEBUG("Round: " << m_roundN);
+                NS_LOG_DEBUG("Event: " << m_roundEventN);
+                NS_LOG_DEBUG("Packet Type: " << (uint32_t)tag.GetPackType());
+                NS_LOG_DEBUG("Time Sent: " << tag.GetTimestamp().As(Time::S));
+                NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
+                NS_LOG_DEBUG("------------------------");
+                NS_LOG_DEBUG("");
+
+            }
         }
 
         m_advertisments++;
@@ -266,22 +300,45 @@ namespace ns3{
     }
 
 
-    void LeachNodeApplication::ScheduleNextEvent(Time dt){
+    void AltRouteNodeApplication::ScheduleNextEvent(Time dt){
         NS_LOG_FUNCTION(this << GetNode()->GetId() << m_roundEventN << m_roundEvents);
 
         if(m_roundEventN < m_roundEvents){
-            Simulator::Schedule(dt, &LeachNodeApplication::ReportEvent, this);
+            m_routeN = 0;
+            m_target = m_chAddress;
+            m_ack = false;
+            Simulator::Schedule(dt, &AltRouteNodeApplication::AltRoute, this);
         }
         else{
-            m_roundN++;
-            ScheduleNextRound(40 * m_interval);
-            //Simulator::Schedule(dt + m_interval, &LeachNodeApplication::CHSend, this, true);
+            ScheduleNextRound(dt);
         }
     }
 
 
-    void LeachNodeApplication::ReportEvent(){
+    void AltRouteNodeApplication::AltRoute(){
+        NS_LOG_FUNCTION(this);
+
+        if(CheckDead()){
+            return;
+        }
+
+        if(m_routeN < m_routes){
+            ReportEvent();
+        }
+        else{
+            m_roundEventN++;
+            ScheduleNextEvent(m_maxNodes * m_interval);
+        }
+
+    }
+
+
+    void AltRouteNodeApplication::ReportEvent(){
         NS_LOG_FUNCTION(this << GetNode()->GetId());
+
+        if(CheckDead()){
+            return;
+        }
 
         LeachTag tag;
         tag.SetPackType(LeachTag::RE);
@@ -295,24 +352,38 @@ namespace ns3{
         packet = Create<Packet>(m_packetSize);
         packet->AddPacketTag(tag);
 
-        m_txTrace(packet);
+        if(m_routeN == 0){
+            m_txTrace(packet);
+        }
 
-        Send(packet, m_chAddress);
+        m_routeN++;
+
+        if(!m_ack){
+            Send(packet, m_target);
+        }
+
+        if(!m_nodes.empty()){
+            m_target = m_nodes.back();
+            m_nodes.pop_back();
+        }
+
+        Simulator::Schedule(m_interval, &AltRouteNodeApplication::AltRoute, this);
     }
 
 
-    void LeachNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
+    void AltRouteNodeApplication::Send(Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << address);
 
         if(CheckDead()){
             return;
         }
 
+        LeachTag tag;
+        packet->PeekPacketTag(tag);
+        
         if(!m_isCh && !m_isMal){
             m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
 
-            LeachTag tag;
-            packet->PeekPacketTag(tag);
 
             NS_LOG_DEBUG("--------NODE SENT-------");
             NS_LOG_DEBUG("Id: " << GetNode()->GetId());
@@ -331,6 +402,12 @@ namespace ns3{
             NS_LOG_DEBUG("");
 
         }
+        else if(m_isMal){
+            NS_LOG_DEBUG("--------MAL NODE--------");
+            NS_LOG_DEBUG("------------------------");
+            NS_LOG_DEBUG("");
+
+        }
         else if(m_isCh){
             //AppendPack(packet);
             CHSend(packet);
@@ -338,14 +415,11 @@ namespace ns3{
 
         m_seqNum++;
 
-        m_roundEventN++;
-
-        ScheduleNextEvent(m_maxNodes * m_interval);
     }
 
-    void LeachNodeApplication::CHSend(Ptr<Packet> packet){
+    void AltRouteNodeApplication::CHSend(Ptr<Packet> packet){
         NS_LOG_FUNCTION(this);
-        
+
         if(CheckDead()){
             return;
         }
@@ -374,17 +448,44 @@ namespace ns3{
             NS_LOG_DEBUG("------------------------");
             NS_LOG_DEBUG("");
         }
+        else if(m_isMal){
+            NS_LOG_DEBUG("---------MAL CH---------");
+            NS_LOG_DEBUG("------------------------");
+            NS_LOG_DEBUG("");
+        }
 
-        m_agroPacket = Create<Packet>(0);
+        m_agroPacket = Create<Packet>(m_packetSize);
+    }
 
-        //if(last){
-        //    m_roundN++;
-        //    ScheduleNextRound(m_interval);
-        //}
+    void AltRouteNodeApplication::CHSend(Ptr<Packet> packet, Ipv4Address address){
+        NS_LOG_FUNCTION(this << m_isMal);
+
+        LeachTag tag;
+        packet->PeekPacketTag(tag);
+
+
+        //packet = Create<Packet>(m_packetSize);
+
+        m_socket->SendTo(packet, 0, InetSocketAddress(address, m_port));
+
+        NS_LOG_DEBUG("--------ACK SENT--------");
+        NS_LOG_DEBUG("Id: " << GetNode()->GetId());
+        NS_LOG_DEBUG("Ip: " << m_localAddress);
+        NS_LOG_DEBUG("To: " << address);
+        NS_LOG_DEBUG("Ch: " << m_isCh);
+        NS_LOG_DEBUG("Mal: " << m_isMal);
+        NS_LOG_DEBUG("Round: " << m_roundN);
+        NS_LOG_DEBUG("Event: " << m_roundEventN);
+        NS_LOG_DEBUG("Packet Type: " << (uint32_t)tag.GetPackType());
+        NS_LOG_DEBUG("Packet Num: " << (uint32_t)tag.GetSeqNum());
+        NS_LOG_DEBUG("Time Sent: " << tag.GetTimestamp().As(Time::S));
+        NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
+        NS_LOG_DEBUG("------------------------");
+        NS_LOG_DEBUG("");
     }
 
 
-    void LeachNodeApplication::HandleRead(Ptr<Socket> socket){
+    void AltRouteNodeApplication::HandleRead(Ptr<Socket> socket){
         NS_LOG_FUNCTION(this << socket);
 
         Ptr<Packet> packet;
@@ -435,23 +536,86 @@ namespace ns3{
                 if(m_isCh && type == LeachTag::RE){
                     // Add received packet to larger packet
                     // AppendPack(packet);
+                    
                     CHSend(packet);
                 }
-                else if(!m_isCh && type == LeachTag::AD && delay < m_shortestDelay){
+                else if(!m_isCh && type == LeachTag::RE){
+                    LeachTag tag2;
+                    
+                    tag2.SetCHAddress(m_chAddress);
+                    tag2.SetNodeAddress(tag.GetNodeAddress());
+                    tag2.SetPackType(tag.GetPackType());
+                    tag2.SetSeqNum(tag.GetSeqNum());
+                    tag2.SetTimestamp(tag.GetTimestamp());
+                    
+                    packet->RemovePacketTag(tag);
+                    packet->AddPacketTag(tag2);
+                    
+                    NS_LOG_DEBUG("--------ALT ROUTE-------");
+                    NS_LOG_DEBUG(tag2.GetCHAddress());
+                    NS_LOG_DEBUG("------------------------");
+                    NS_LOG_DEBUG("");
 
-                    NS_LOG_DEBUG("---------CH SET---------");
+                    Send(packet, m_chAddress);
+                }
+                else if(!m_isCh && type == LeachTag::AD && delay < m_shortestDelay){
+                    if(std::find(m_blacklist.begin(), m_blacklist.end(), tag.GetNodeAddress()) == m_blacklist.end()){
+                        m_chAddress = fromAddress;
+                        m_shortestDelay = delay;
+
+                        NS_LOG_DEBUG("---------CH SET---------");
+                        NS_LOG_DEBUG("Id: " << GetNode()->GetId());
+                        NS_LOG_DEBUG("Ip: " << m_localAddress);
+                        NS_LOG_DEBUG("CH: " << fromAddress);
+                        NS_LOG_DEBUG("Time Sent: " << tag.GetTimestamp().As(Time::S));
+                        NS_LOG_DEBUG("Time Received: " << Simulator::Now().As(Time::S));
+                        NS_LOG_DEBUG("------------------------");
+                        NS_LOG_DEBUG("");
+                    }
+                    else{
+                        NS_LOG_DEBUG("-------CH NOT SET-------");
+                        NS_LOG_DEBUG("This node is blacklisted");
+                        NS_LOG_DEBUG("Id: " << GetNode()->GetId());
+                        NS_LOG_DEBUG("Ip: " << m_localAddress);
+                        NS_LOG_DEBUG("CH: " << fromAddress);
+                        NS_LOG_DEBUG("Time Sent: " << tag.GetTimestamp().As(Time::S));
+                        NS_LOG_DEBUG("Time Received: " << Simulator::Now().As(Time::S));
+                        NS_LOG_DEBUG("------------------------");
+                        NS_LOG_DEBUG("");
+                    }
+
+                }
+                else if(type == LeachTag::ADN){
+                    NS_LOG_DEBUG("---NEIGHBOR NODE SET---");
                     NS_LOG_DEBUG("Id: " << GetNode()->GetId());
                     NS_LOG_DEBUG("Ip: " << m_localAddress);
-                    NS_LOG_DEBUG("CH: " << fromAddress);
+                    NS_LOG_DEBUG("CH: " << tag.GetNodeAddress());
                     NS_LOG_DEBUG("Time Sent: " << tag.GetTimestamp().As(Time::S));
                     NS_LOG_DEBUG("Time Received: " << Simulator::Now().As(Time::S));
                     NS_LOG_DEBUG("------------------------");
                     NS_LOG_DEBUG("");
+                    
 
-                    m_chAddress = fromAddress;
-                    m_shortestDelay = delay;
+                    if(std::find(m_nodes.begin(), m_nodes.end(), tag.GetNodeAddress()) == m_nodes.end()){
+                        m_nodes.push_back(tag.GetNodeAddress());
+                    }
+                }
+                else if(type == LeachTag::AK){
+                    if(m_isCh && m_localAddress != tag.GetNodeAddress()){
+                        CHSend(packet, tag.GetNodeAddress());
+                    }
+                    else{
+                        NS_LOG_DEBUG("------ACK RECEIVED------");
+                        NS_LOG_DEBUG(tag.GetNodeAddress());
+                        NS_LOG_DEBUG("------------------------");
+                        NS_LOG_DEBUG("");
+
+                        m_ack = true;
+                    }
                 }
             }
+
+            //ReportStatus();
 
             m_rxTrace(packet);
         }
@@ -459,7 +623,11 @@ namespace ns3{
     }
 
 
-    bool LeachNodeApplication::CheckDead(){
+    bool AltRouteNodeApplication::CheckDead(){
+        NS_LOG_FUNCTION(this);
+
+        NS_LOG_DEBUG(m_energyModel);
+
         if(m_energyModel->GetCurrentState() == WifiPhyState::OFF){
             if(!m_dead){
                 NS_LOG_DEBUG("--------NODE DEAD-------");
@@ -470,7 +638,7 @@ namespace ns3{
                 NS_LOG_DEBUG("");
 
                 m_dead = true;
-                m_energyTrace();
+                m_energyTrace(m_roundN);
             }
         }
 
@@ -478,7 +646,7 @@ namespace ns3{
     }
 
 
-    void LeachNodeApplication::AppendPack(Ptr<Packet> packet){
+    void AltRouteNodeApplication::AppendPack(Ptr<Packet> packet){
         NS_LOG_FUNCTION(this);
 
         // m_agroPacket->AddAtEnd(packet);
@@ -503,70 +671,71 @@ namespace ns3{
 
 
     // Getters & Setters
-    TypeId LeachNodeApplication::GetTypeId(){
-        static TypeId tid = TypeId("ns3::LeachNodeApplication")
+    TypeId AltRouteNodeApplication::GetTypeId(){
+        static TypeId tid = TypeId("ns3::AltRouteNodeApplication")
             .SetParent<Application>()
             .SetGroupName("Applications")
-            .AddConstructor<LeachNodeApplication>()
+            .AddConstructor<AltRouteNodeApplication>()
             .AddAttribute("IsCh", "If node is cluster head", BooleanValue(false), 
-                            MakeBooleanAccessor(&LeachNodeApplication::m_isCh), MakeBooleanChecker())
+                            MakeBooleanAccessor(&AltRouteNodeApplication::m_isCh), MakeBooleanChecker())
             .AddAttribute("IsMal", "If node is malicious", BooleanValue(false), 
-                            MakeBooleanAccessor(&LeachNodeApplication::m_isMal), MakeBooleanChecker())
+                            MakeBooleanAccessor(&AltRouteNodeApplication::m_isMal), MakeBooleanChecker())
+
             .AddAttribute("RoundEvents", "Number of evnets in a round", IntegerValue(5), 
-                            MakeDoubleAccessor(&LeachNodeApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
-            .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&LeachNodeApplication::m_rxTrace),
+                            MakeDoubleAccessor(&AltRouteNodeApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
+            .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&AltRouteNodeApplication::m_rxTrace),
                             "Packet::TracedCallback")
             .AddTraceSource("RxWithAddresses", "A packet has been sent",
-                            MakeTraceSourceAccessor(&LeachNodeApplication::m_rxTraceWithAddresses),
+                            MakeTraceSourceAccessor(&AltRouteNodeApplication::m_rxTraceWithAddresses),
                             "Packet::TwoAddressTracedCallback")
-            .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&LeachNodeApplication::m_txTrace),
+            .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&AltRouteNodeApplication::m_txTrace),
                             "Packet::TracedCallback")
             .AddTraceSource("RemainingEnergy", "Energy change callback",
-                            MakeTraceSourceAccessor(&LeachNodeApplication::m_energyTrace),
+                            MakeTraceSourceAccessor(&AltRouteNodeApplication::m_energyTrace),
                             "TracedValueCallback::Double")
             .AddTraceSource("Status", "Status report callback",
-                            MakeTraceSourceAccessor(&LeachNodeApplication::m_statusTrace),
+                            MakeTraceSourceAccessor(&AltRouteNodeApplication::m_statusTrace),
                             "TracedValueCallback::Double");
         return tid;
     }
 
 
-    void LeachNodeApplication::SetInterval(Time time){
+    void AltRouteNodeApplication::SetInterval(Time time){
         m_interval = time;
     }
 
 
-    Time LeachNodeApplication::GetInterval(){
+    Time AltRouteNodeApplication::GetInterval(){
         return m_interval;
     }
 
 
-    void LeachNodeApplication::SetIsCh(bool x){
+    void AltRouteNodeApplication::SetIsCh(bool x){
         m_isCh = x;
     }
 
 
-    bool LeachNodeApplication::GetIsCh(){
+    bool AltRouteNodeApplication::GetIsCh(){
         return m_isCh;
     }
 
 
-    void LeachNodeApplication::SetIsMal(bool x){
+    void AltRouteNodeApplication::SetIsMal(bool x){
         m_isMal = x;
     }
 
 
-    bool LeachNodeApplication::GetIsMal(){
+    bool AltRouteNodeApplication::GetIsMal(){
         return m_isMal;
     }
 
 
-    void LeachNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
+    void AltRouteNodeApplication::SetEnergyModel(Ptr<DeviceEnergyModel> model){
         m_energyModel = DynamicCast<WifiRadioEnergyModel>(model);
     }
 
 
-    Ptr<WifiRadioEnergyModel> LeachNodeApplication::GetEnergyModel(){
+    Ptr<WifiRadioEnergyModel> AltRouteNodeApplication::GetEnergyModel(){
         return m_energyModel;
     }
 } // ns3

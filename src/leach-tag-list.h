@@ -2,15 +2,23 @@
 #include "ns3/core-module.h"
 #include "ns3/applications-module.h"
 
+#include "ns3/leach-tag.h"
+
 
 namespace ns3{
-    class SeqNumTag: public Tag{
+    class LeachTagList: public Tag{
         public:
-            SeqNumTag();
+            LeachTagList();
 
-            void SetSeq(uint32_t seq);
+            ~LeachTagList();
 
-            uint32_t GetSeqNum();
+            void PushTag(LeachTag tag);
+
+            LeachTag PopTag();
+
+            LeachTag BackTag();
+
+            uint32_t GetSize();
 
             TypeId GetTypeId() const;
 
@@ -25,6 +33,7 @@ namespace ns3{
             void Print(std::ostream &os) const override;
 
         private:
-            uint32_t m_seqNum;
+            std::vector<LeachTag> *m_list;
+            uint32_t m_listSize;
     };
 }

@@ -3,7 +3,7 @@
  *  Author: Marcel Vieira
  *
  *  Description:
- *      Header file for LeachSinkApplication class. This class implements LEACH protocol on a sink.
+ *      Header file for ArcLeachSinkApplication class. This class implements LEACH protocol on a sink.
  *
  */
 
@@ -22,11 +22,11 @@
 
 
 namespace ns3{
-    class LeachSinkApplication: public Application{
+    class ArcLeachSinkApplication: public Application{
         public:
-            LeachSinkApplication();
+            ArcLeachSinkApplication();
 
-            ~LeachSinkApplication() override;
+            ~ArcLeachSinkApplication() override;
 
             static TypeId GetTypeId();
 
@@ -68,7 +68,7 @@ namespace ns3{
 
             std::vector<Ipv4Address> blacklist;
 
-            // Dictionary of potential blacklist nodes
+
 
             uint32_t m_sent;
             uint32_t m_received;

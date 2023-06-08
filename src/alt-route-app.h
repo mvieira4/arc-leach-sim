@@ -3,7 +3,7 @@
  *  Author: Marcel Vieira
  *
  *  Descritpion: 
- *      Header file for LeachNodeApplication class. This class implements LEACH protocol on a node.
+ *      Header file for AltRouteNodeApplication class. This class implements LEACH protocol on a node.
  *
  */
 
@@ -15,6 +15,7 @@
 #include "ns3/udp-socket.h"
 #include "ns3/device-energy-model-container.h"
 #include "ns3/wifi-radio-energy-model.h"
+#include "ns3/yans-wifi-phy.h"
 
 #include <array>
 #include <vector>
@@ -22,11 +23,11 @@
 
 
 namespace ns3{
-    class LeachNodeApplication: public Application{
+    class AltRouteNodeApplication: public Application{
         public:
-            LeachNodeApplication();
+            AltRouteNodeApplication();
 
-            ~LeachNodeApplication() override;
+            ~AltRouteNodeApplication() override;
 
             static TypeId GetTypeId();
 
@@ -66,6 +67,8 @@ namespace ns3{
 
             void ScheduleNextEvent(Time dt);
 
+            void AltRoute();
+
             void ReportEvent();
 
             void ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address);
@@ -73,6 +76,8 @@ namespace ns3{
             void Send(Ptr<Packet> packet, Ipv4Address address);
 
             void CHSend(Ptr<Packet> packet);
+
+            void CHSend(Ptr<Packet> packet, Ipv4Address address);
 
             void HandleRead(Ptr<Socket> socket);
 
@@ -92,8 +97,8 @@ namespace ns3{
             TracedCallback<Ptr<const Packet>, const Address&, 
                                     const Address&> m_txTraceWithAddresses;
 
-            TracedCallback<> m_energyTrace;
-            TracedCallback<> m_statusTrace;
+            TracedCallback<uint32_t> m_energyTrace;
+            TracedCallback<uint32_t> m_statusTrace;
 
 
             EventId m_sendEvent;
@@ -106,13 +111,16 @@ namespace ns3{
             bool m_isCh;
             bool m_isMal;
             bool m_dead;
+            bool m_ack;
              
             Ipv4Address m_localAddress;
             Ipv4Address m_sinkAddress;
             Ipv4Address m_chAddress;
+            Ipv4Address m_target;
             Ipv4Address m_chPrevAddress;
 
-            std::vector<Ipv4Address> blacklist;
+            std::vector<Ipv4Address> m_blacklist;
+            std::vector<Ipv4Address> m_nodes;
 
             uint32_t m_sent;
             uint32_t m_received;
@@ -129,6 +137,9 @@ namespace ns3{
 
             uint32_t m_rounds;
             uint32_t m_roundN;
+
+            uint32_t m_routes;
+            uint32_t m_routeN;
 
             uint32_t m_advertisments;
 

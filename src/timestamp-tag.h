@@ -4,7 +4,7 @@
 
 
 namespace ns3{
-    class TimestampTag: protected ns3::Tag{
+    class TimestampTag: public ns3::Tag{
         public:
                 TimestampTag();
 
@@ -25,6 +25,6 @@ namespace ns3{
                 void Print(std::ostream &os) const override;
 
         private:
-                Time m_timeStamp;
+                Time m_timestamp;
     };
 }

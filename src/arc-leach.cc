@@ -22,10 +22,10 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
-#include "ns3/leach-helper.h"
-#include "ns3/leach-sink-helper.h"
 #include "ns3/gnuplot-helper.h"
 
+#include "ns3/arc-leach-helper.h"
+#include "ns3/arc-leach-sink-helper.h"
 #include "ns3/leach-tag.h"
 
 #include <cmath>
@@ -147,11 +147,11 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachSinkApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("ArcLeachNodeApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("ArcLeachSinkApplication", LOG_LEVEL_ALL);
         //LogComponentEnable("LeachTagList", LOG_LEVEL_DEBUG);
         //LogComponentEnable("LeachTag", LOG_LEVEL_ALL);
-        //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
+        //LogComponentEnable("ArcLeachNodeHelper", LOG_LEVEL_ALL);
         LogComponentEnable("Main", LOG_LEVEL_ALL);
     }
 
@@ -231,14 +231,14 @@ int main(int argc, char* argv[]){
     DeviceEnergyModelContainer energyModels = energyModel.Install(sensorDevices, sensorBatteries);
 
 
-    LeachSinkHelper sinkLeach(nWifi);
+    ArcLeachSinkHelper sinkLeach(nWifi);
 
     ApplicationContainer sinkApp = sinkLeach.Install(sink);
 
     sinkApp.Start(Seconds(0.0));
     sinkApp.Stop(Seconds(5000000.0));
 
-    LeachNodeHelper nodeLeach(nWifi);
+    ArcLeachNodeHelper nodeLeach(nWifi);
 
     ApplicationContainer nodeApps = nodeLeach.Install(sensors, energyModels);
 
@@ -249,23 +249,23 @@ int main(int argc, char* argv[]){
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachSinkApplication/Rx", MakeCallback(&RecvCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/RemainingEnergy",
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::ArcLeachSinkApplication/Rx", MakeCallback(&RecvCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::ArcLeachNodeApplication/Tx", MakeCallback(&SendCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::ArcLeachNodeApplication/RemainingEnergy",
             MakeCallback(&EnergyCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Status",
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::ArcLeachNodeApplication/Status",
             MakeCallback(&StatusCb));
 
-    Config::Set("NodeList/1/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
-    //Config::Set("NodeList/2/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
-    //Config::Set("NodeList/3/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
+    Config::Set("NodeList/1/ApplicationList/0/$ns3::ArcLeachNodeApplication/IsMal", BooleanValue(true));
+    //Config::Set("NodeList/2/ApplicationList/0/$ns3::ArcLeachNodeApplication/IsMal", BooleanValue(true));
+    //Config::Set("NodeList/3/ApplicationList/0/$ns3::ArcLeachNodeApplication/IsMal", BooleanValue(true));
 
     // Run Sim
     Simulator::Stop(Seconds(5000000.0));
     Simulator::Run();
     Simulator::Destroy();
 
-    std::string fileNameWithNoExtension = "leach-pack-plot";
+    std::string fileNameWithNoExtension = "arc-pack-plot";
     std::string graphicsFileName        = fileNameWithNoExtension + ".png";
     std::string plotFileName            = fileNameWithNoExtension + ".plt";
     std::string plotTitle               = "2-D Plot";
@@ -291,7 +291,7 @@ int main(int argc, char* argv[]){
 
 
 
-    fileNameWithNoExtension = "leach-alive-plot";
+    fileNameWithNoExtension = "arc-alive-plot";
     graphicsFileName        = fileNameWithNoExtension + ".png";
     plotFileName            = fileNameWithNoExtension + ".plt";
     plotTitle               = "2-D Plot";
@@ -304,7 +304,7 @@ int main(int argc, char* argv[]){
     plot2.SetTitle(plotTitle);
 
     plot2.SetTerminal("png");
-    plot2.SetLegend("Round", "Nodes");
+    plot2.SetLegend("Time", "Percentage");
     plot2.AppendExtra("set yrange [0:45]");
     //plot2.AppendExtra("set xrange [20000:25000]");
 

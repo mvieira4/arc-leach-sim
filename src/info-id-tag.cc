@@ -1,4 +1,4 @@
-#include "info-id-tag.h"
+#include "ns3/info-id-tag.h"
 
 
 
@@ -16,8 +16,10 @@ ns3::TypeId InfoIdTag::GetTypeId() const{
     static ns3::TypeId tid = ns3::TypeId("ns3::InfoIdTag")
                                 .SetParent<Tag>()
                                 .SetGroupName("Leach")
-                                .AddConstructor<InfoIdTag>();
-
+                                .AddConstructor<InfoIdTag>()
+                                .AddAttribute ("InfoId", "Id for type of info",
+                                    ns3::StringValue(""), MakeStringAccessor (&InfoIdTag::m_infoId),
+                                    ns3::MakeStringChecker());
     return tid;
 }
 
@@ -31,7 +33,7 @@ uint32_t InfoIdTag::GetSerializedSize() const{
 
 void InfoIdTag::Serialize(ns3::TagBuffer buffer) const{
     const char* tmp = m_infoId.c_str();
-    uint8_t len = (uint8_t)m_infoId.size();
+    uint8_t len = m_infoId.size();
 
     buffer.WriteU8(len);
     buffer.Write((uint8_t*)tmp, (uint32_t)len);

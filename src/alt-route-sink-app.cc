@@ -3,7 +3,7 @@
  *  Author: Marcel Vieira
  *
  *  Description:
- *      Source file for LeachSinkApplication class. This class implements LEACH protocol on a sink.
+ *      Source file for AltRouteSinkApplication class. This class implements LEACH protocol on a sink.
  *
  */
 
@@ -21,13 +21,13 @@
 #include "ns3/basic-energy-source.h"
 #include "ns3/wifi-net-device.h"
 
-#include "ns3/leach-sink-app.h"
+#include "ns3/alt-route-sink-app.h"
 #include "ns3/leach-tag-list.h"
 
 namespace ns3{
-    NS_LOG_COMPONENT_DEFINE("LeachSinkApplication");
+    NS_LOG_COMPONENT_DEFINE("AltRouteSinkApplication");
     
-    LeachSinkApplication::LeachSinkApplication(): m_lossCounter(0){
+    AltRouteSinkApplication::AltRouteSinkApplication(): m_lossCounter(0){
         NS_LOG_FUNCTION(this << Simulator::Now().As(Time::S));
 
         m_socket = nullptr;
@@ -42,7 +42,7 @@ namespace ns3{
     }
 
 
-    LeachSinkApplication::~LeachSinkApplication(){
+    AltRouteSinkApplication::~AltRouteSinkApplication(){
         NS_LOG_FUNCTION(this << Simulator::Now().As(Time::S));
 
         m_socket = nullptr;
@@ -51,33 +51,33 @@ namespace ns3{
 
 
     // Getters & Setters
-    TypeId LeachSinkApplication::GetTypeId(){
-        static TypeId tid = TypeId("ns3::LeachSinkApplication")
+    TypeId AltRouteSinkApplication::GetTypeId(){
+        static TypeId tid = TypeId("ns3::AltRouteSinkApplication")
             .SetParent<Application>()
             .SetGroupName("Applications")
-            .AddConstructor<LeachSinkApplication>()
+            .AddConstructor<AltRouteSinkApplication>()
             .AddAttribute("RoundEvents", "Number of evnets in a round", IntegerValue(5), 
-                            MakeDoubleAccessor(&LeachSinkApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
-            .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&LeachSinkApplication::m_rxTrace),
+                            MakeDoubleAccessor(&AltRouteSinkApplication::m_roundEvents), MakeUintegerChecker<uint32_t>())
+            .AddTraceSource("Rx", "A packet has been received", MakeTraceSourceAccessor(&AltRouteSinkApplication::m_rxTrace),
                             "Packet::TracedCallback")
             .AddTraceSource("RxWithAddresses", "A packet has been sent",
-                            MakeTraceSourceAccessor(&LeachSinkApplication::m_rxTraceWithAddresses),
+                            MakeTraceSourceAccessor(&AltRouteSinkApplication::m_rxTraceWithAddresses),
                             "Packet::TwoAddressTracedCallback")
-            .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&LeachSinkApplication::m_txTrace),
+            .AddTraceSource("Tx", "A packet has been sent", MakeTraceSourceAccessor(&AltRouteSinkApplication::m_txTrace),
                             "Packet::TracedCallback");
 
         return tid;
     }
 
     // Methods
-    void LeachSinkApplication::DoDispose(){
+    void AltRouteSinkApplication::DoDispose(){
         NS_LOG_FUNCTION(this << Simulator::Now().As(Time::S));
 
         Application::DoDispose();
     }
 
 
-    void LeachSinkApplication::StartApplication(){
+    void AltRouteSinkApplication::StartApplication(){
         NS_LOG_FUNCTION(this << Simulator::Now().As(Time::S));
 
         Ptr<Ipv4> ipv4 = m_node->GetObject<Ipv4>();
@@ -88,7 +88,7 @@ namespace ns3{
         m_socket->SetAllowBroadcast(true);
         m_socket->BindToNetDevice(GetNode()->GetDevice(0)); 
         m_socket->Bind(InetSocketAddress(m_localAddress, m_port)); 
-        m_socket->SetRecvCallback(MakeCallback(&LeachSinkApplication::HandleRead, this));
+        m_socket->SetRecvCallback(MakeCallback(&AltRouteSinkApplication::HandleRead, this));
         m_socket->Listen();
 
         Ptr<UdpSocket> udpSocket = DynamicCast<UdpSocket> (m_socket);
@@ -96,7 +96,7 @@ namespace ns3{
     }
 
 
-    void LeachSinkApplication::StopApplication(){
+    void AltRouteSinkApplication::StopApplication(){
         NS_LOG_FUNCTION(this << Simulator::Now().As(Time::S));
      
         if (m_socket){
@@ -105,14 +105,14 @@ namespace ns3{
     }
 
 
-    void LeachSinkApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
+    void AltRouteSinkApplication::ScheduleTransmit(Time dt, Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << dt);
 
-        m_sendEvent = Simulator::Schedule(dt, &LeachSinkApplication::Send, this, packet, address);
+        m_sendEvent = Simulator::Schedule(dt, &AltRouteSinkApplication::Send, this, packet, address);
     }
 
 
-    void LeachSinkApplication::Send(Ptr<Packet> packet, Ipv4Address address){
+    void AltRouteSinkApplication::Send(Ptr<Packet> packet, Ipv4Address address){
         NS_LOG_FUNCTION(this << address);
 
         LeachTag tag;
@@ -140,7 +140,7 @@ namespace ns3{
     }
 
 
-    void LeachSinkApplication::HandleRead(Ptr<Socket> socket){
+    void AltRouteSinkApplication::HandleRead(Ptr<Socket> socket){
         NS_LOG_FUNCTION(this << socket);
 
         Ptr<Packet> packet;
@@ -179,6 +179,23 @@ namespace ns3{
             NS_LOG_DEBUG("");
 
             m_rxTrace(packet);
+
+            if(tag.GetPackType() == LeachTag::ARE || tag.GetPackType() == LeachTag::RE){
+                LeachTag tag2;
+                tag2.SetPackType(LeachTag::AK);
+                tag2.SetNodeAddress(tag.GetNodeAddress());
+                tag2.SetTimestamp(Simulator::Now());
+
+                packet = Create<Packet>(m_packetSize);
+                packet->AddPacketTag(tag2);
+
+                if(tag.GetCHAddress() != m_localAddress){
+                    Send(packet, tag.GetCHAddress());
+                }
+                else{
+                    Send(packet, tag.GetNodeAddress());
+                }
+            }
         }
     }
 

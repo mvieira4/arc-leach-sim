@@ -1,26 +1,26 @@
-#include "ns3/leach-helper.h"
+#include "ns3/arc-leach-helper.h"
 
 
 
 
 
 namespace ns3{
-    NS_LOG_COMPONENT_DEFINE("LeachNodeHelper");
+    NS_LOG_COMPONENT_DEFINE("ArcLeachNodeHelper");
 
-    LeachNodeHelper::LeachNodeHelper(uint32_t nodeNum){
+    ArcLeachNodeHelper::ArcLeachNodeHelper(uint32_t nodeNum){
         NS_LOG_FUNCTION(this);
 
-        NS_LOG_DEBUG("LeachNodeHelper: Number of nodes is " << nodeNum);
+        NS_LOG_DEBUG("ArcLeachNodeHelper: Number of nodes is " << nodeNum);
 
-        m_factory.SetTypeId(LeachNodeApplication::GetTypeId());
+        m_factory.SetTypeId(ArcLeachNodeApplication::GetTypeId());
     }
 
 
-    ApplicationContainer LeachNodeHelper::Install(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
+    ApplicationContainer ArcLeachNodeHelper::Install(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
         return ApplicationContainer(InstallPriv(node, energyModel));
     }
 
-    ApplicationContainer LeachNodeHelper::Install(NodeContainer nodes, DeviceEnergyModelContainer energyModels) const{
+    ApplicationContainer ArcLeachNodeHelper::Install(NodeContainer nodes, DeviceEnergyModelContainer energyModels) const{
         ApplicationContainer apps;
 
         NodeContainer::Iterator node = nodes.Begin();
@@ -37,12 +37,12 @@ namespace ns3{
         return apps;
     }
 
-    void LeachNodeHelper::SetAttribute(std::string name, const AttributeValue &value){
+    void ArcLeachNodeHelper::SetAttribute(std::string name, const AttributeValue &value){
         m_factory.Set(name, value);
     }
 
-    Ptr<Application> LeachNodeHelper::InstallPriv(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
-        Ptr<LeachNodeApplication> app;  
+    Ptr<Application> ArcLeachNodeHelper::InstallPriv(Ptr<Node> node, Ptr<DeviceEnergyModel> energyModel) const{
+        Ptr<ArcLeachNodeApplication> app;  
 
         // Create a random number generator
         std::random_device rd;
@@ -52,7 +52,7 @@ namespace ns3{
         std::uniform_real_distribution<double> dis(0.0, 1.0);
         double random_double = dis(gen);
 
-        app = m_factory.Create<LeachNodeApplication>();
+        app = m_factory.Create<ArcLeachNodeApplication>();
         app->SetEnergyModel(energyModel);
 
         node->AddApplication(app);

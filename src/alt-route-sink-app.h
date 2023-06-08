@@ -3,7 +3,7 @@
  *  Author: Marcel Vieira
  *
  *  Description:
- *      Header file for LeachSinkApplication class. This class implements LEACH protocol on a sink.
+ *      Header file for AltRouteSinkApplication class. This class implements LEACH protocol on a sink.
  *
  */
 
@@ -22,11 +22,11 @@
 
 
 namespace ns3{
-    class LeachSinkApplication: public Application{
+    class AltRouteSinkApplication: public Application{
         public:
-            LeachSinkApplication();
+            AltRouteSinkApplication();
 
-            ~LeachSinkApplication() override;
+            ~AltRouteSinkApplication() override;
 
             static TypeId GetTypeId();
 

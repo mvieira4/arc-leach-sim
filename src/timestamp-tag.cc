@@ -1,14 +1,14 @@
-#include "timestamp-tag.h"
+#include "ns3/timestamp-tag.h"
 
 namespace ns3{
-    TimestampTag::TimestampTag(): m_timeStamp(0){}
+    TimestampTag::TimestampTag(): m_timestamp(0){}
 
     void TimestampTag::SetTimestamp(Time timestamp){
-        m_timeStamp = timestamp;
+        m_timestamp = timestamp;
     }
 
     Time TimestampTag::GetTimestamp(){
-        return m_timeStamp;
+        return m_timestamp;
     }
 
     ns3::TypeId TimestampTag::GetTypeId() const{
@@ -25,18 +25,18 @@ namespace ns3{
     }
 
     uint32_t TimestampTag::GetSerializedSize() const{
-        return sizeof(m_timeStamp);
+        return 8;
     }
 
     void TimestampTag::Serialize(TagBuffer buffer) const{
-        buffer.WriteDouble(m_timeStamp.GetDouble());
+        buffer.WriteU64(m_timestamp.GetTimeStep());
     }
 
     void TimestampTag::Deserialize(TagBuffer buffer){
-        m_timeStamp = Seconds(buffer.ReadDouble());
+        m_timestamp = TimeStep(buffer.ReadU64());
     }
 
     void TimestampTag::Print(std::ostream &os) const{
-        os << "Timestamp: " << m_timeStamp << "\n";
+        os << m_timestamp.As(Time::S) << "\n";
     }
 }

@@ -1,10 +1,11 @@
 #include "ns3/network-module.h"
 #include "ns3/core-module.h"
 #include "ns3/applications-module.h"
+#include "ns3/object.h"
 
 
 
-class InfoIdTag: protected ns3::Tag{
+class InfoIdTag: public ns3::Tag{
     public:
         InfoIdTag();
 

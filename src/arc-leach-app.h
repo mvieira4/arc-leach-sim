@@ -3,7 +3,7 @@
  *  Author: Marcel Vieira
  *
  *  Descritpion: 
- *      Header file for LeachNodeApplication class. This class implements LEACH protocol on a node.
+ *      Header file for ArcLeachNodeApplication class. This class implements LEACH protocol on a node.
  *
  */
 
@@ -22,11 +22,11 @@
 
 
 namespace ns3{
-    class LeachNodeApplication: public Application{
+    class ArcLeachNodeApplication: public Application{
         public:
-            LeachNodeApplication();
+            ArcLeachNodeApplication();
 
-            ~LeachNodeApplication() override;
+            ~ArcLeachNodeApplication() override;
 
             static TypeId GetTypeId();
 
@@ -74,6 +74,8 @@ namespace ns3{
 
             void CHSend(Ptr<Packet> packet);
 
+            void CHSend(Ptr<Packet> packet, Ipv4Address address);
+
             void HandleRead(Ptr<Socket> socket);
 
             bool CheckDead();
@@ -93,7 +95,7 @@ namespace ns3{
                                     const Address&> m_txTraceWithAddresses;
 
             TracedCallback<> m_energyTrace;
-            TracedCallback<> m_statusTrace;
+            TracedCallback<uint32_t> m_statusTrace;
 
 
             EventId m_sendEvent;
@@ -112,7 +114,8 @@ namespace ns3{
             Ipv4Address m_chAddress;
             Ipv4Address m_chPrevAddress;
 
-            std::vector<Ipv4Address> blacklist;
+            std::vector<Ipv4Address> m_blacklist;
+            std::vector<Ipv4Address> m_nodes;
 
             uint32_t m_sent;
             uint32_t m_received;

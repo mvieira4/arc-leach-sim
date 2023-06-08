@@ -22,10 +22,10 @@
 #include "ns3/basic-energy-source-helper.h"
 #include "ns3/wifi-radio-energy-model-helper.h"
 #include "ns3/propagation-delay-model.h"
-#include "ns3/leach-helper.h"
-#include "ns3/leach-sink-helper.h"
 #include "ns3/gnuplot-helper.h"
 
+#include "ns3/alt-route-helper.h"
+#include "ns3/alt-route-sink-helper.h"
 #include "ns3/leach-tag.h"
 
 #include <cmath>
@@ -37,7 +37,7 @@ using namespace ns3;
 
 // Constants
 const bool verbose = true;
-const uint32_t nWifi = 12;
+const uint32_t nWifi = 24;
 
 // Globals
 uint32_t deadNode = 0; 
@@ -46,6 +46,10 @@ uint32_t recvPacks = 0;
 Gnuplot2dDataset packData;
 Gnuplot2dDataset aliveData;
 
+void SendCb(Ptr<const Packet> packet);
+void RecvCb(Ptr<const Packet> packet);
+void EnergyCb(uint32_t round);
+void StatusCb(uint32_t round);
 
 NS_LOG_COMPONENT_DEFINE("Main");
 
@@ -55,7 +59,7 @@ void SendCb(Ptr<const Packet> packet){
     packet->PeekPacketTag(tag);
 
     if(tag.GetPackType() == LeachTag::RE || tag.GetPackType() == LeachTag::ARE){
-        sentPacks ++;
+        sentPacks++;
 
         NS_LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>");
         NS_LOG_DEBUG("Packet Size: " << packet->GetSize());
@@ -97,7 +101,7 @@ void RecvCb(Ptr<const Packet> packet){
     }
 }
 
-void EnergyCb(){
+void EnergyCb(uint32_t round){
     deadNode++;
 
     NS_LOG_DEBUG("!!!!!!!!!!!!!!!!!!!!");
@@ -106,6 +110,8 @@ void EnergyCb(){
     NS_LOG_DEBUG("Time: " << std::round(Simulator::Now().GetSeconds() * 10) / 10);
     NS_LOG_DEBUG("!!!!!!!!!!!!!!!!!!!!");
     NS_LOG_DEBUG("");
+
+    StatusCb(round);
 }
 
 void StatusCb(uint32_t round){
@@ -147,11 +153,11 @@ int main(int argc, char* argv[]){
         //LogComponentEnable("BasicEnergySource", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiRadioEnergyModel", LOG_LEVEL_INFO);
         //LogComponentEnable("WifiMac", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachNodeApplication", LOG_LEVEL_ALL);
-        LogComponentEnable("LeachSinkApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("AltRouteNodeApplication", LOG_LEVEL_ALL);
+        LogComponentEnable("AltRouteSinkApplication", LOG_LEVEL_ALL);
         //LogComponentEnable("LeachTagList", LOG_LEVEL_DEBUG);
         //LogComponentEnable("LeachTag", LOG_LEVEL_ALL);
-        //LogComponentEnable("LeachNodeHelper", LOG_LEVEL_ALL);
+        //LogComponentEnable("AltRouteNodeHelper", LOG_LEVEL_ALL);
         LogComponentEnable("Main", LOG_LEVEL_ALL);
     }
 
@@ -171,7 +177,7 @@ int main(int argc, char* argv[]){
     }
 
 
-    // Create & Configure Wifi Deviceshttps://umassd.zoom.us/j/93281343753?pwd=UWd5TGsweFpyMC9ydWhzaWErZnlndz09
+    // Create & Configure Wifi Devices
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
     channel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
     channel.AddPropagationLoss("ns3::FriisPropagationLossModel");
@@ -188,7 +194,7 @@ int main(int argc, char* argv[]){
     mac.SetType("ns3::AdhocWifiMac");
     
     WifiHelper wifi;
-    wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
+    //wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
     wifi.SetStandard(WIFI_STANDARD_80211g);
 
     NetDeviceContainer sinkDevices = wifi.Install(phy, mac, sink);
@@ -231,14 +237,14 @@ int main(int argc, char* argv[]){
     DeviceEnergyModelContainer energyModels = energyModel.Install(sensorDevices, sensorBatteries);
 
 
-    LeachSinkHelper sinkLeach(nWifi);
+    AltRouteSinkHelper sinkLeach(nWifi);
 
     ApplicationContainer sinkApp = sinkLeach.Install(sink);
 
     sinkApp.Start(Seconds(0.0));
     sinkApp.Stop(Seconds(5000000.0));
 
-    LeachNodeHelper nodeLeach(nWifi);
+    AltRouteNodeHelper nodeLeach(nWifi);
 
     ApplicationContainer nodeApps = nodeLeach.Install(sensors, energyModels);
 
@@ -249,23 +255,23 @@ int main(int argc, char* argv[]){
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachSinkApplication/Rx", MakeCallback(&RecvCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Tx", MakeCallback(&SendCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/RemainingEnergy",
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::AltRouteSinkApplication/Rx", MakeCallback(&RecvCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::AltRouteNodeApplication/Tx", MakeCallback(&SendCb));
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::AltRouteNodeApplication/RemainingEnergy",
             MakeCallback(&EnergyCb));
-    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::LeachNodeApplication/Status",
+    Config::ConnectWithoutContext("NodeList/*/ApplicationList/*/$ns3::AltRouteNodeApplication/Status",
             MakeCallback(&StatusCb));
 
-    Config::Set("NodeList/1/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
-    //Config::Set("NodeList/2/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
-    //Config::Set("NodeList/3/ApplicationList/0/$ns3::LeachNodeApplication/IsMal", BooleanValue(true));
+    Config::Set("NodeList/1/ApplicationList/0/$ns3::AltRouteNodeApplication/IsMal", BooleanValue(true));
+    //Config::Set("NodeList/2/ApplicationList/0/$ns3::AltRouteNodeApplication/IsMal", BooleanValue(true));
+    //Config::Set("NodeList/3/ApplicationList/0/$ns3::AltRouteNodeApplication/IsMal", BooleanValue(true));
 
     // Run Sim
     Simulator::Stop(Seconds(5000000.0));
     Simulator::Run();
     Simulator::Destroy();
 
-    std::string fileNameWithNoExtension = "leach-pack-plot";
+    std::string fileNameWithNoExtension = "alt-pack-plot";
     std::string graphicsFileName        = fileNameWithNoExtension + ".png";
     std::string plotFileName            = fileNameWithNoExtension + ".plt";
     std::string plotTitle               = "2-D Plot";
@@ -291,7 +297,7 @@ int main(int argc, char* argv[]){
 
 
 
-    fileNameWithNoExtension = "leach-alive-plot";
+    fileNameWithNoExtension = "alt-alive-plot";
     graphicsFileName        = fileNameWithNoExtension + ".png";
     plotFileName            = fileNameWithNoExtension + ".plt";
     plotTitle               = "2-D Plot";
@@ -304,7 +310,7 @@ int main(int argc, char* argv[]){
     plot2.SetTitle(plotTitle);
 
     plot2.SetTerminal("png");
-    plot2.SetLegend("Round", "Nodes");
+    plot2.SetLegend("Time", "Percentage");
     plot2.AppendExtra("set yrange [0:45]");
     //plot2.AppendExtra("set xrange [20000:25000]");
 
